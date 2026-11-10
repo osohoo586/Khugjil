@@ -16,12 +16,12 @@ jobs:
         env:
           POSTGRES_PASSWORD: test-only-not-secret
           POSTGRES_DB: khugjil_test
-        ports: ["55432:5432"]
+        ports: ["55442:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 30
       redis:
         image: redis:7-alpine
-        ports: ["56379:6379"]
+        ports: ["56389:6379"]
         options: >-
           --health-cmd "redis-cli ping" --health-interval 2s --health-retries 30
     steps:

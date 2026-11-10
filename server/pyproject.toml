@@ -61,7 +61,8 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC", "PT", "N", 
 ignore = ["RUF001", "RUF002", "RUF003"]  # Cyrillic text is intentional
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "S311", "ASYNC240"]
+"src/khugjil/db/migrations/**" = ["E501"]
+"tests/**" = ["S101", "S105", "S106", "S311", "S608", "ASYNC240"]
 
 [tool.mypy]
 strict = true
@@ -95,3 +96,6 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["khugjil", "tests"]

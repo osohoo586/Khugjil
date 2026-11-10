@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Run from the repo root unless noted. Tests need the throwaway Postgres/Redis containers.
 
 ```sh
-make services                  # start test Postgres (127.0.0.1:55432) + Redis (:56379)
+make services                  # start test Postgres (127.0.0.1:55442) + Redis (:56389)
 make lint typecheck security   # ruff + format check, mypy --strict, bandit + pip-audit
 make test                      # full pytest suite
 make coverage                  # tests + per-package ≥95% gate (scripts/coverage_gate.py)

@@ -14,7 +14,6 @@ from tests.invariants.helpers import pending
 pytestmark = pytest.mark.invariant(8)
 
 
-@pending("pipeline")
 def test_key_is_deterministic_and_input_sensitive(crypto: Crypto) -> None:
     from khugjil.ingest.pipeline import idempotency_key
 
@@ -30,7 +29,6 @@ def test_key_is_deterministic_and_input_sensitive(crypto: Crypto) -> None:
     assert len({base, *variants}) == 5
 
 
-@pending("pipeline")
 @pytest.mark.db
 async def test_same_email_twice_is_stored_once(world, mailer: Mailer) -> None:  # type: ignore[no-untyped-def]
     raw = mailer.bank_mail()
@@ -45,7 +43,6 @@ async def test_same_email_twice_is_stored_once(world, mailer: Mailer) -> None:  
     assert await world.count("transaction") == 1
 
 
-@pending("pipeline")
 @pytest.mark.db
 async def test_concurrent_duplicates_store_once(world, mailer: Mailer) -> None:  # type: ignore[no-untyped-def]
     raw = mailer.bank_mail()

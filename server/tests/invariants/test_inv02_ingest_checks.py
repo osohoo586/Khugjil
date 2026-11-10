@@ -20,7 +20,7 @@ from tests.fixtures.emails import (
     break_dkim,
     build_message,
 )
-from tests.invariants.helpers import evaluate, pending, two_accounts
+from tests.invariants.helpers import evaluate, two_accounts
 
 pytestmark = pytest.mark.invariant(2)
 
@@ -254,7 +254,6 @@ def test_drop_result_carries_only_reason_and_msgid_hash(mailer: Mailer) -> None:
 # ---------------------------------------------------------------- a + logging (database)
 
 
-@pending("database + pipeline")
 @pytest.mark.db
 async def test_a_unknown_recipient_rejected_nothing_stored(world, mailer: Mailer) -> None:  # type: ignore[no-untyped-def]
     before = await world.count("ingest_event"), await world.count("transaction")
@@ -263,7 +262,6 @@ async def test_a_unknown_recipient_rejected_nothing_stored(world, mailer: Mailer
     assert (await world.count("ingest_event"), await world.count("transaction")) == before
 
 
-@pending("database + pipeline")
 @pytest.mark.db
 async def test_drop_logs_only_allowed_fields(world, mailer: Mailer, log_capture) -> None:  # type: ignore[no-untyped-def]
     outcome = await world.ingest(mailer.bank_mail(from_addr="evil@attacker.example"))

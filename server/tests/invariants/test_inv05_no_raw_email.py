@@ -8,9 +8,8 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.emails import FakeTxn, Mailer, build_message
-from tests.invariants.helpers import pending
 
-pytestmark = [pytest.mark.invariant(5), pending("pipeline"), pytest.mark.db]
+pytestmark = [pytest.mark.invariant(5), pytest.mark.db]
 
 HEADER_MARKER = "RAWHEADERMARKER7731"
 FOOTER_MARKER = "RAWFOOTERMARKER9917"

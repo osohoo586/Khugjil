@@ -21,9 +21,9 @@ TEST_MASTER_KEY = base64.b64encode(b"\x01" * 32).decode()
 
 TEST_DATABASE_URL = os.environ.get(
     "KHJ_TEST_DATABASE_URL",
-    "postgresql+psycopg://postgres:test-only-not-secret@127.0.0.1:55432/khugjil_test",
+    "postgresql+psycopg://postgres:test-only-not-secret@127.0.0.1:55442/khugjil_test",
 )
-TEST_REDIS_URL = os.environ.get("KHJ_TEST_REDIS_URL", "redis://127.0.0.1:56379/0")
+TEST_REDIS_URL = os.environ.get("KHJ_TEST_REDIS_URL", "redis://127.0.0.1:56389/0")
 
 
 def make_settings(**overrides: Any) -> Settings:

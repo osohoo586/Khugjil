@@ -9,9 +9,8 @@ from __future__ import annotations
 import pytest
 
 from tests.fixtures.emails import TENANT_ACCOUNT, FakeTxn, Mailer
-from tests.invariants.helpers import pending
 
-pytestmark = [pytest.mark.invariant(9), pending("database + RLS"), pytest.mark.db]
+pytestmark = [pytest.mark.invariant(9), pytest.mark.db]
 
 
 async def test_every_tenant_table_has_forced_rls(world) -> None:  # type: ignore[no-untyped-def]
@@ -59,7 +58,10 @@ async def test_other_tenants_account_email_is_dropped(world, other_world, mailer
 
 
 async def test_account_hmac_differs_per_tenant(world, other_world) -> None:  # type: ignore[no-untyped-def]
-    await other_world.add_account(TENANT_ACCOUNT)
+    # Both worlds registered the same fake number (TENANT_ACCOUNT) for their own tenant.
     rows = await world.rows("bank_account")
-    hmacs = [r["number_hmac"] for r in rows if r["status"] == "active"]
-    assert len(hmacs) == len(set(hmacs))
+    assert {r["tenant_id"] for r in rows} == {world.tenant_id, other_world.tenant_id}
+    hmacs = [bytes(r["number_hmac"]) for r in rows]
+    assert len(hmacs) == 2
+    assert hmacs[0] != hmacs[1]
+    assert TENANT_ACCOUNT.encode() not in b"".join(bytes(r["number_enc"]) for r in rows)

@@ -40,7 +40,6 @@ def evaluate(
     include_own_transfers: bool = False,
 ) -> Any:
     from khugjil.ingest.checks import AccountMatch, BankConfig, evaluate
-
     from tests.conftest import make_settings
 
     if accounts is None:
