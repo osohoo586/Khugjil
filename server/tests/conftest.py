@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import base64
+import io
 import os
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 import pytest
@@ -47,3 +49,46 @@ def settings() -> Settings:
 @pytest.fixture(scope="session")
 def crypto(settings: Settings) -> Crypto:
     return Crypto(settings.master_key_bytes)
+
+
+@pytest.fixture(scope="session")
+def mailer() -> Any:
+    from tests.fixtures.emails import Mailer
+
+    return Mailer()
+
+
+@pytest.fixture
+def log_capture() -> Iterator[io.StringIO]:
+    from khugjil.logs import configure_logging
+
+    buf = io.StringIO()
+    configure_logging("DEBUG", stream=buf)
+    yield buf
+    configure_logging("INFO")
+
+
+# Database fixtures. They import the application lazily so that, before the database layer
+# exists, tests depending on them fail at setup and are reported as xfail (not as errors).
+
+
+@pytest.fixture(scope="session")
+async def db(settings: Settings, mailer: Any) -> AsyncIterator[Any]:
+    from tests.fixtures.world import TestDatabase
+
+    database = await TestDatabase.start(settings, dnsfunc=mailer.dns)
+    try:
+        yield database
+    finally:
+        await database.close()
+
+
+@pytest.fixture
+async def world(db: Any) -> Any:
+    await db.reset()
+    return await db.new_world("A")
+
+
+@pytest.fixture
+async def other_world(db: Any, world: Any) -> Any:
+    return await db.new_world("B")
