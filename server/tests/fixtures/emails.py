@@ -243,7 +243,7 @@ def forwarding_confirmation(code: str = "123456789") -> bytes:
     msg["From"] = "Gmail Team <forwarding-noreply@google.com>"
     msg["To"] = "fake@in.khugjil.test"
     msg["Subject"] = (
-        "(#123456789) Gmail Forwarding Confirmation - Receive Mail from shop.owner@gmail.example"
+        f"(#{code}) Gmail Forwarding Confirmation - Receive Mail from shop.owner@gmail.example"
     )
     msg["Date"] = "Thu, 15 Oct 2026 08:40:00 +0800"
     msg["Message-ID"] = "<fwd-1@google.com>"

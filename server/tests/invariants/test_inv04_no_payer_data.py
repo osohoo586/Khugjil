@@ -15,7 +15,6 @@ MARKERS = [PAYER_ACCOUNT, "TESTPAYERMARKER", "TESTSELLERMARKER", "9,876,543.21",
 FORBIDDEN_FIELD_WORDS = ("payer", "from_account", "balance", "seller", "name", "rate")
 
 
-@pending("ingest checks")
 def test_accepted_result_has_no_payer_fields(mailer: Mailer) -> None:
     from khugjil.ingest.checks import Accepted
 

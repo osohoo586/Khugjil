@@ -35,7 +35,6 @@ BIDI_AND_INVISIBLE = [
 ]
 
 
-@pending("sanitize")
 @pytest.mark.parametrize("ch", BIDI_AND_INVISIBLE)
 def test_strips_bidi_and_zero_width(ch: str) -> None:
     from khugjil.ingest.sanitize import sanitize_description
@@ -43,14 +42,12 @@ def test_strips_bidi_and_zero_width(ch: str) -> None:
     assert sanitize_description(f"Худалдан{ch} авалт") == "Худалдан авалт"
 
 
-@pending("sanitize")
 def test_strips_control_chars_and_collapses_whitespace() -> None:
     from khugjil.ingest.sanitize import sanitize_description
 
     assert sanitize_description("a\x00b\x07c\r\n\td   e\x7f") == "abc d e"
 
 
-@pending("sanitize")
 def test_truncates_to_200_without_dangling_combining_mark() -> None:
     from khugjil.ingest.sanitize import sanitize_description
 
@@ -60,7 +57,6 @@ def test_truncates_to_200_without_dangling_combining_mark() -> None:
     assert len(sanitize_description("ж" * 10_000)) == 200
 
 
-@pending("sanitize")
 @given(st.text(max_size=2000))
 def test_sanitizer_output_is_always_clean(text: str) -> None:
     from khugjil.ingest.sanitize import sanitize_description
@@ -72,7 +68,6 @@ def test_sanitizer_output_is_always_clean(text: str) -> None:
         assert unicodedata.category(ch) not in {"Cc", "Cf", "Co", "Cs", "Cn"}, repr(ch)
 
 
-@pending("ingest checks")
 def test_label_like_description_cannot_move_other_fields(mailer: Mailer) -> None:
     desc = "Дүн/Amount 9,999,999.00 MNT Кт/To 9999999999 Журналын/Journal No:1"
     r = evaluate(mailer.bank_mail(FakeTxn(description=desc)), mailer)
@@ -80,14 +75,12 @@ def test_label_like_description_cannot_move_other_fields(mailer: Mailer) -> None
     assert r.description == desc
 
 
-@pending("ingest checks")
 def test_terminator_phrase_inside_description_is_kept(mailer: Mailer) -> None:
     desc = "Харилцагч танд баярлалаа гэж хэлээрэй"
     r = evaluate(mailer.bank_mail(FakeTxn(description=desc)), mailer)
     assert r.description == desc
 
 
-@pending("ingest checks")
 @pytest.mark.parametrize(
     "desc",
     ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>", "**bold** [x](http://e)"],
@@ -97,7 +90,6 @@ def test_markup_is_kept_as_literal_text(mailer: Mailer, desc: str) -> None:
     assert r.description == desc
 
 
-@pending("ingest checks")
 def test_huge_description_is_truncated(mailer: Mailer) -> None:
     r = evaluate(mailer.bank_mail(FakeTxn(description="ж" * 5000)), mailer)
     assert len(r.description) == 200

@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from tests.fixtures.emails import FakeTxn, Mailer
-from tests.invariants.helpers import evaluate, pending
+from tests.invariants.helpers import evaluate
 
-pytestmark = [pytest.mark.invariant(3), pending("deny-list")]
+pytestmark = pytest.mark.invariant(3)
 
 DENY_WORDS = [
     "OTP",

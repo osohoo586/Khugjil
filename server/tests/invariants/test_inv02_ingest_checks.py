@@ -22,7 +22,7 @@ from tests.fixtures.emails import (
 )
 from tests.invariants.helpers import evaluate, pending, two_accounts
 
-pytestmark = [pytest.mark.invariant(2), pending("ingest checks a-g")]
+pytestmark = pytest.mark.invariant(2)
 
 
 def reason(result: object) -> str:
@@ -186,7 +186,6 @@ def test_f_to_account_not_registered(mailer: Mailer) -> None:
 
 def test_f_inactive_account(mailer: Mailer) -> None:
     from khugjil.ingest.checks import AccountMatch
-
     from tests.invariants.helpers import ACCOUNT_ID
 
     accounts = {"2222222222": AccountMatch(account_id=ACCOUNT_ID, active=False)}
@@ -255,6 +254,7 @@ def test_drop_result_carries_only_reason_and_msgid_hash(mailer: Mailer) -> None:
 # ---------------------------------------------------------------- a + logging (database)
 
 
+@pending("database + pipeline")
 @pytest.mark.db
 async def test_a_unknown_recipient_rejected_nothing_stored(world, mailer: Mailer) -> None:  # type: ignore[no-untyped-def]
     before = await world.count("ingest_event"), await world.count("transaction")
@@ -263,6 +263,7 @@ async def test_a_unknown_recipient_rejected_nothing_stored(world, mailer: Mailer
     assert (await world.count("ingest_event"), await world.count("transaction")) == before
 
 
+@pending("database + pipeline")
 @pytest.mark.db
 async def test_drop_logs_only_allowed_fields(world, mailer: Mailer, log_capture) -> None:  # type: ignore[no-untyped-def]
     outcome = await world.ingest(mailer.bank_mail(from_addr="evil@attacker.example"))

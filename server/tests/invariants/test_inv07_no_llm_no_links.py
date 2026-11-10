@@ -7,7 +7,7 @@ import ast
 import pytest
 
 from tests.fixtures.emails import Mailer
-from tests.invariants.helpers import SRC_DIR, evaluate, locked_packages, pending
+from tests.invariants.helpers import SRC_DIR, evaluate, locked_packages
 
 pytestmark = pytest.mark.invariant(7)
 
@@ -51,7 +51,6 @@ def test_ingest_package_imports_no_network_clients() -> None:
     assert offenders == []
 
 
-@pending("ingest checks")
 def test_links_and_images_are_never_fetched(mailer: Mailer) -> None:
     from khugjil.ingest.checks import Accepted
 
