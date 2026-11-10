@@ -10,7 +10,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from tests.fixtures.emails import TENANT_ACCOUNT, FakeTxn, Mailer
-from tests.invariants.helpers import SRC_DIR, evaluate, pending
+from tests.invariants.helpers import SRC_DIR, evaluate
 
 pytestmark = pytest.mark.invariant(6)
 
@@ -104,9 +104,8 @@ def test_telegram_payload_is_plain_text() -> None:
     assert payload["link_preview_options"] == {"is_disabled": True}
 
 
-@pending("admin panel")
 def test_admin_templates_autoescape() -> None:
-    from khugjil.admin.templating import env
+    from khugjil.admin.core import env
 
     out = env.from_string("{{ d }}").render(d="<script>alert(1)</script>")
     assert "<script>" not in out

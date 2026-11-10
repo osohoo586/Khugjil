@@ -62,7 +62,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # Cyrillic text is intentional
 
 [tool.ruff.lint.per-file-ignores]
 "src/khugjil/db/migrations/**" = ["E501"]
-"tests/**" = ["S101", "S105", "S106", "S311", "S608", "ASYNC240"]
+"tests/**" = ["S101", "S105", "S106", "S107", "S311", "S608", "ASYNC240", "E501"]
 
 [tool.mypy]
 strict = true

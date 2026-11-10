@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Гүйлгээний түүх{% endblock %}
+{% block content %}
+<div class="title-row"><h1>Гүйлгээний түүх</h1>
+{% if ctx.role in ("owner", "admin") %}<a class="btn btn-secondary" href="/history.csv?date_from={{ f.date_from | urlq }}&date_to={{ f.date_to | urlq }}&account={{ f.account | urlq }}&amount_min={{ f.amount_min | urlq }}&amount_max={{ f.amount_max | urlq }}">CSV татах</a>{% endif %}</div>
+<form method="get" action="/history" class="row-form filters">
+  {{ ui.field("date_from", "Эхлэх огноо", value=f.date_from, type="date") }}
+  {{ ui.field("date_to", "Дуусах огноо", value=f.date_to, type="date") }}
+  <label class="field"><span class="field-label">Данс</span><select name="account"><option value="">Бүгд</option>{% for a in accounts %}<option value="{{ a.id }}"{% if f.account == a.id|string %} selected{% endif %}>{{ a.alias }}</option>{% endfor %}</select></label>
+  {{ ui.field("amount_min", "Дүн (доод)", value=f.amount_min, attrs={"inputmode": "decimal"}) }}
+  {{ ui.field("amount_max", "Дүн (дээд)", value=f.amount_max, attrs={"inputmode": "decimal"}) }}
+  <button class="btn btn-primary" type="submit">Шүүх</button>
+</form>
+{% if rows %}
+<table class="table">
+  <thead><tr><th>Огноо, цаг</th><th>Данс</th><th class="num">Дүн</th><th>Утга</th></tr></thead>
+  <tbody>
+  {% for r in rows %}<tr><td class="tabular">{{ r.txn_at | dt }}</td><td>{{ r.account }}</td><td class="num tabular">{{ r.amount | amount(r.currency) }}</td><td class="truncate" title="{{ r.description }}">{{ r.description }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+<div class="title-row">{{ ui.pager(page, pages, "/history?date_from=" ~ (f.date_from | urlq) ~ "&date_to=" ~ (f.date_to | urlq) ~ "&account=" ~ (f.account | urlq) ~ "&amount_min=" ~ (f.amount_min | urlq) ~ "&amount_max=" ~ (f.amount_max | urlq) ~ "&") }}<span class="muted tabular">Нийт {{ total }} гүйлгээ</span></div>
+{% else %}
+{{ ui.empty("Гүйлгээ олдсонгүй", "Шүүлтүүрээ өөрчилж дахин хайна уу.") }}
+{% endif %}
+{% endblock %}

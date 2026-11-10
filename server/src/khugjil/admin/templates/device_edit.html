@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ device.name }}{% endblock %}
+{% block content %}
+<p><a href="/devices">‹ Төхөөрөмжүүд</a></p>
+<h1>{{ device.name }}</h1>
+<form method="post" action="/devices/{{ device.id }}" class="stack narrow">
+  {{ ui.csrf() }}
+  {{ ui.field("name", "Нэр", value=device.name, required=True, attrs={"maxlength": "60"}) }}
+  <fieldset><legend>Бүлэг</legend>{% for g in groups %}<label class="check"><input type="checkbox" name="group_ids" value="{{ g.id }}"{% if g.id in selected %} checked{% endif %}> {{ g.name }}</label>{% endfor %}</fieldset>
+  <button class="btn btn-primary" type="submit">Хадгалах</button>
+</form>
+{% endblock %}

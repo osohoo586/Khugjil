@@ -1,4 +1,4 @@
-.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e
+.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets
 
 COMPOSE_TEST = docker compose -f deploy/docker-compose.test.yml
 
@@ -28,5 +28,10 @@ cashier-check:
 
 e2e:
 	cd e2e && npx playwright test
+
+sync-assets:          ## copy shared design tokens + fonts into the admin static folder
+	mkdir -p server/src/khugjil/admin/static/shared/fonts
+	cp shared/tokens.css server/src/khugjil/admin/static/shared/
+	cp shared/fonts/* server/src/khugjil/admin/static/shared/fonts/
 
 check: lint typecheck security coverage

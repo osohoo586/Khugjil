@@ -1,0 +1,142 @@
+/*
+ * Design tokens shared by the admin panel, the cashier view (and later the desktop agent).
+ * SPEC §8.1: calm and ledger-like; one neutral palette plus one accent (tenant setting);
+ * semantic colours only for state; 1px borders instead of shadows; radius <= 6px; 8px grid;
+ * IBM Plex Sans (self-hosted) with tabular numerals; WCAG 2.2 AA contrast.
+ * Font files: IBM Plex Sans, SIL Open Font License 1.1 (fonts/OFL-IBM-Plex.txt).
+ */
+
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/ibm-plex-sans-cyrillic-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/ibm-plex-sans-cyrillic-400-normal.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/ibm-plex-sans-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/ibm-plex-sans-cyrillic-ext-500-normal.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/ibm-plex-sans-cyrillic-500-normal.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/ibm-plex-sans-latin-ext-500-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/ibm-plex-sans-cyrillic-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/ibm-plex-sans-cyrillic-600-normal.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/ibm-plex-sans-latin-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113; }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+:root {
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+
+  /* Type scale 13/14/16/20/28/48; body text never below 14px. */
+  --fs-xs: 13px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 28px;
+  --fs-2xl: 48px;
+  --lh-tight: 1.2;
+  --lh-body: 1.5;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* 8px spacing grid. */
+  --sp-0: 4px;
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 24px;
+  --sp-4: 32px;
+  --sp-5: 48px;
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --border-w: 1px;
+  --hit: 40px;
+  --focus-w: 2px;
+
+  /* Neutral palette (light theme, default). */
+  --bg: #ffffff;
+  --bg-subtle: #f6f7f8;
+  --surface: #ffffff;
+  --border: #d4d8dd;
+  --border-strong: #9aa1a9;
+  --text: #1b1f23;
+  --text-muted: #59616a;
+  --row-hover: #f1f3f5;
+
+  /* Accent (tenant setting: green by default, navy optional). */
+  --accent: #1f5e3b;
+  --accent-strong: #164a2d;
+  --accent-tint: #e7f0ea;
+  --on-accent: #ffffff;
+  --focus: var(--accent);
+
+  /* Semantic colours: state only, never decoration. */
+  --success: #1c7038;
+  --success-tint: #e6f3ea;
+  --warning: #835400;
+  --warning-tint: #fbf1d9;
+  --error: #b42318;
+  --error-tint: #fcebe9;
+
+  --motion: 150ms;
+}
+
+[data-accent="navy"] {
+  --accent: #1d3557;
+  --accent-strong: #142740;
+  --accent-tint: #e7ecf3;
+}
+
+[data-theme="dark"] {
+  --bg: #15181b;
+  --bg-subtle: #1c2024;
+  --surface: #1c2024;
+  --border: #353b42;
+  --border-strong: #5a626b;
+  --text: #e9ecef;
+  --text-muted: #a9b1b9;
+  --row-hover: #23282d;
+  --accent: #5fb487;
+  --accent-strong: #79c49b;
+  --accent-tint: #1d3227;
+  --on-accent: #0d1a12;
+  --success: #6cc68d;
+  --success-tint: #1b3123;
+  --warning: #e3b55a;
+  --warning-tint: #33291a;
+  --error: #f08a80;
+  --error-tint: #3a1f1c;
+}
+
+[data-theme="dark"][data-accent="navy"] {
+  --accent: #8fb0dc;
+  --accent-strong: #a9c3e6;
+  --accent-tint: #1d2738;
+  --on-accent: #0c1420;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion: 0ms; }
+}

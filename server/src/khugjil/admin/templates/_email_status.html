@@ -1,0 +1,6 @@
+{% import "_ui.html" as ui with context %}
+<p>Төлөв:
+{% if "forwarding_silent" in alerts %}{{ ui.badge("warning", "Банкны имэйл удаан ирээгүй") }} Gmail-ийн дамжуулалт, шүүлтүүрээ шалгана уу.
+{% elif "template_changed" in alerts %}{{ ui.badge("warning", "Формат өөрчлөгдсөн байж магадгүй") }} Үйлчилгээ үзүүлэгчид мэдэгдэнэ үү.
+{% elif last_ok %}{{ ui.badge("success", "Хэвийн") }} Сүүлийн банкны имэйл {{ last_ok | dt }}.
+{% else %}{{ ui.badge("neutral", "Хүлээгдэж байна") }} Банкны имэйл одоогоор ирээгүй.{% endif %}</p>

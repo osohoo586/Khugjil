@@ -163,3 +163,14 @@ def test_cli_migrate_requires_url(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.delenv("KHJ_MIGRATION_DATABASE_URL", raising=False)
     assert main(["migrate"]) == 2
+
+
+def test_shared_assets_are_in_sync() -> None:
+    """The admin panel serves copies of shared/ (run `make sync-assets` after editing shared/)."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    shared, copy = root / "shared", root / "server/src/khugjil/admin/static/shared"
+    for src in [shared / "tokens.css", *sorted((shared / "fonts").iterdir())]:
+        dst = copy / src.relative_to(shared)
+        assert dst.read_bytes() == src.read_bytes(), f"{dst} is out of date"

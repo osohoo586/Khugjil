@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Бүлгүүд{% endblock %}
+{% block content %}
+<h1>Бүлгүүд</h1>
+<p class="muted">Бүлэг нь аль данс руу орсон орлогыг аль хэрэглэгч, аль төхөөрөмж дээр харуулахыг тодорхойлно.</p>
+{% if groups %}
+<table class="table">
+  <thead><tr><th>Нэр</th><th>Төлөв</th><th class="num">Данс</th><th class="num">Хэрэглэгч</th><th class="num">Төхөөрөмж</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <tbody>
+  {% for g in groups %}
+  <tr>
+    <td>{{ g.name }}</td>
+    <td>{% if g.status == "active" %}{{ ui.badge("success", "Идэвхтэй") }}{% else %}{{ ui.badge("neutral", "Идэвхгүй") }}{% endif %}</td>
+    <td class="num tabular">{{ counts[g.id]["a"] }}</td><td class="num tabular">{{ counts[g.id]["m"] }}</td><td class="num tabular">{{ counts[g.id]["d"] }}</td>
+    <td class="num"><a href="/groups/{{ g.id }}">Засах</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+{{ ui.empty("Бүлэг үүсгээгүй байна", "Доор бүлэг үүсгээд данс, хэрэглэгч, төхөөрөмжөө холбоно уу.") }}
+{% endif %}
+<h2>Бүлэг үүсгэх</h2>
+<form method="post" action="/groups" class="row-form">{{ ui.csrf() }}{{ ui.field("name", "Нэр", required=True, attrs={"maxlength": "60"}) }}<button class="btn btn-primary" type="submit">Үүсгэх</button></form>
+{% endblock %}

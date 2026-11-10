@@ -25,6 +25,12 @@ from khugjil.events import device_channel
 from khugjil.runtime import Runtime
 
 HEARTBEAT_S = 15.0
+TEST_NOTIFICATION = {
+    "test": True,
+    "amount_text": "100 ₮",
+    "description": "Туршилтын мэдэгдэл",
+    "account_alias": None,
+}
 MAX_STREAMS = 2
 
 
@@ -82,6 +88,8 @@ async def sse_events(
                     yield frame
             elif kind in ("shift_ended", "settings_changed"):
                 yield _frame(kind, {})
+            elif kind == "test":
+                yield _frame("test", TEST_NOTIFICATION)
             elif kind == "device_revoked":
                 yield _frame("device_revoked", {})
                 return

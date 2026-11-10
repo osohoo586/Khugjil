@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Хэрэглэгчид{% endblock %}
+{% block content %}
+<h1>Хэрэглэгчид</h1>
+<table class="table">
+  <thead><tr><th>Нэр</th><th>Үүрэг</th><th>Бүлэг</th><th>Зөвшөөрөл</th><th>Хуваарь</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <tbody>
+  {% for m in members %}
+  <tr>
+    <td>{{ m.display_name }}{% if m.id in linked %} <span class="muted small">· Telegram</span>{% endif %}</td>
+    <td>{{ m.role | role }}</td>
+    <td>{{ (member_groups.get(m.id) or ["—"]) | join(", ") }}</td>
+    <td>
+      {% if m.status == "invited" %}{{ ui.badge("warning", "Урилга хүлээгдэж буй") }}
+      {% elif consents.get(m.id) %}{{ ui.badge("success", "Идэвхтэй v" ~ consents[m.id][0].version) }}
+      {% elif m.role == "viewer" %}<span class="muted">—</span>
+      {% else %}{{ ui.badge("neutral", "Өгөөгүй") }}{% endif %}
+    </td>
+    <td class="small">{% for w in windows.get(m.id, []) %}{{ WEEKDAYS[w.weekday] }} {{ w.start_local.strftime("%H:%M") }}–{{ w.end_local.strftime("%H:%M") }}{% if not loop.last %}, {% endif %}{% else %}<span class="muted">Хуваарьгүй</span>{% endfor %}</td>
+    <td class="num actions">
+      {% if m.role in roles and m.id != ctx.member.id %}
+      <a href="/members/{{ m.id }}">Засах</a>
+      {{ ui.confirm_form("/members/" ~ m.id ~ "/reinvite", "Шинэ урилга", m.display_name ~ "-д шинэ урилга үүсгэх үү? Одоогийн ПИН код, нууц үг хүчингүй болж, ээлж нь дуусна.", "secondary") }}
+      {% if consents.get(m.id) %}{{ ui.confirm_form("/members/" ~ m.id ~ "/consent/revoke", "Зөвшөөрөл цуцлах", m.display_name ~ "-ийн зөвшөөрлийг цуцлах уу? Мэдэгдэл шууд зогсоно.", "secondary") }}{% endif %}
+      {{ ui.confirm_form("/members/" ~ m.id ~ "/revoke", "Эрх цуцлах", m.display_name ~ "-ийн эрхийг цуцлах уу? Идэвхтэй ээлж нь шууд дуусч, мэдэгдэл цаашид ирэхгүй.") }}
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6">{{ ui.empty("Хэрэглэгч алга", "Доорх маягтаар хэрэглэгч урина уу.") }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if ctx.role == "owner" and ctx.rt.settings.telegram_bot_username %}
+<form method="post" action="/me/telegram" class="inline">{{ ui.csrf() }}<button class="btn btn-secondary" type="submit">Telegram-аа холбох</button></form>
+{% endif %}
+<h2>Хэрэглэгч урих</h2>
+<form method="post" action="/members" class="stack narrow">
+  {{ ui.csrf() }}
+  {{ ui.field("display_name", "Нэр", required=True, attrs={"maxlength": "60"}) }}
+  <label class="field"><span class="field-label">Үүрэг</span><select name="role">{% for r in roles %}<option value="{{ r }}"{% if r == "cashier" %} selected{% endif %}>{{ r | role }}</option>{% endfor %}</select></label>
+  <fieldset><legend>Бүлэг</legend>{% for gid, name in groups.items() %}<label class="check"><input type="checkbox" name="group_ids" value="{{ gid }}"> {{ name }}</label>{% else %}<p class="muted">Эхлээд бүлэг үүсгэнэ үү.</p>{% endfor %}</fieldset>
+  <button class="btn btn-primary" type="submit">Урилга үүсгэх</button>
+</form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Аудит лог{% endblock %}
+{% block content %}
+<h1>Аудит лог</h1>
+{% if rows %}
+<table class="table">
+  <thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Объект</th></tr></thead>
+  <tbody>{% for r in rows %}<tr><td class="tabular">{{ r.at | dt }}</td><td>{{ names.get(r.actor_id, "Систем") }}</td><td><code>{{ r.action }}</code></td><td>{{ r.object_label or "—" }}</td></tr>{% endfor %}</tbody>
+</table>
+{{ ui.pager(page, pages, "/audit?") }}
+{% else %}{{ ui.empty("Бичлэг алга", "Админы үйлдэл бүр энд бүртгэгдэнэ.") }}{% endif %}
+{% endblock %}

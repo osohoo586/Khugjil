@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Тохиргоо{% endblock %}
+{% block content %}
+<h1>Тохиргоо</h1>
+{% if saved %}<p class="notice notice-success" role="status">Хадгаллаа.</p>{% endif %}
+{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/settings" class="stack narrow">
+  {{ ui.csrf() }}
+  <fieldset><legend>Харагдах байдал</legend>
+    <label class="field"><span class="field-label">Үндсэн өнгө</span><select name="accent"><option value="green"{% if t.accent == "green" %} selected{% endif %}>Ногоон</option><option value="navy"{% if t.accent == "navy" %} selected{% endif %}>Хар хөх</option></select></label>
+    {{ ui.field("toast_seconds", "Мэдэгдэл харагдах хугацаа (секунд, 5–20)", value=t.toast_seconds, type="number", required=True, attrs={"min": "5", "max": "20"}) }}
+    <label class="check"><input type="checkbox" name="show_today_totals" value="true"{% if t.show_today_totals %} checked{% endif %}> Кассын дэлгэц дээр өнөөдрийн тоо, дүнг харуулах</label>
+  </fieldset>
+  <fieldset><legend>Дуут мэдэгдэл</legend>
+    <label class="check"><input type="checkbox" name="voice_enabled" value="true"{% if t.voice_enabled %} checked{% endif %}> Дүнг монголоор уншиж сонсгох</label>
+    {{ ui.field("voice_max_amount", "Энэ дүнгээс дээш бол зөвхөн дохио өгөх (₮)", value=(t.voice_max_amount or ""), attrs={"inputmode": "decimal"}, hint="Хоосон бол бүх дүнг уншина.") }}
+  </fieldset>
+  <fieldset><legend>Ээлж</legend>
+    {{ ui.field("shift_idle_hours", "Идэвхгүй бол ээлж дуусах хугацаа (цаг)", value=t.shift_idle_hours, type="number", required=True, attrs={"min": "1", "max": "24"}) }}
+    {{ ui.field("shift_end_time", "Ээлж автоматаар дуусах цаг", value=(t.shift_end_time.strftime("%H:%M") if t.shift_end_time else ""), type="time", hint="Хоосон бол тохируулахгүй.") }}
+  </fieldset>
+  <fieldset><legend>Дамжуулалтын хяналт</legend>
+    {{ ui.field("health_silence_hours", "Банкны имэйл ирэхгүй бол анхааруулах хугацаа (ажлын цаг)", value=t.health_silence_hours, type="number", required=True, attrs={"min": "1", "max": "72"}) }}
+    <div class="row-form">
+      {{ ui.field("business_start", "Ажлын цаг эхлэх", value=t.business_hours.get("start", "09:00"), type="time", required=True) }}
+      {{ ui.field("business_end", "Ажлын цаг дуусах", value=t.business_hours.get("end", "21:00"), type="time", required=True) }}
+    </div>
+    <div class="weekdays">{% for d in WEEKDAYS %}<label class="check"><input type="checkbox" name="business_days" value="{{ loop.index0 }}"{% if loop.index0 in t.business_hours.get("days", []) %} checked{% endif %}> {{ d }}</label>{% endfor %}</div>
+    <label class="check"><input type="checkbox" name="include_own_transfers" value="true"{% if t.include_own_transfers %} checked{% endif %}> Өөрийн данс хоорондын шилжүүлгийг орлогод тооцох</label>
+  </fieldset>
+  <button class="btn btn-primary" type="submit">Хадгалах</button>
+</form>
+{% endblock %}

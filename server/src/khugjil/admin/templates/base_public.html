@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="mn" data-accent="green">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Хугжил{% endblock %}</title>
+  <link rel="stylesheet" href="/static/shared/tokens.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+  <script src="/static/js/admin.js" defer></script>
+</head>
+<body class="public">
+  <main class="public-card">
+    <p class="brand">Хугжил</p>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

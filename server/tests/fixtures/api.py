@@ -113,3 +113,48 @@ class ApiHarness:
         await self.set_pin()
         r = await self.start_shift()
         assert r.status_code == 200, r.text
+
+
+async def make_admin(
+    world: Any, role: str = "owner", login: str | None = None, password: str = "tsagaan-sar-2026"
+) -> tuple[uuid.UUID, str, str]:
+    """Create an active member who can sign in. Returns (member_id, login, totp_secret)."""
+    import pyotp
+
+    from khugjil.crypto import field_aad
+
+    secret = pyotp.random_base32()
+    login = login or f"{role}-{uuid.uuid4().hex[:6]}"
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        m = Member(
+            tenant_id=world.tenant_id,
+            display_name=f"Д. {role}",
+            role=role,
+            status="active",
+            login_name=login,
+            password_hash=hash_secret(password),
+            totp_secret_enc=world.db.crypto.encrypt(
+                secret, field_aad(world.tenant_id, "member", "totp_secret_enc")
+            ),
+        )
+        s.add(m)
+        await s.flush()
+        return m.id, login, secret
+
+
+async def admin_login(
+    h: ApiHarness, login: str, secret: str, password: str = "tsagaan-sar-2026"
+) -> str:
+    """Sign in through the real forms; returns the CSRF token from the page."""
+    import re
+
+    import pyotp
+
+    r = await h.client.post("/login", data={"login_name": login, "password": password})
+    assert r.status_code == 303, r.text
+    r = await h.client.post("/login/totp", data={"code": pyotp.TOTP(secret).now()})
+    assert r.status_code == 303, r.text
+    page = await h.client.get("/")
+    match = re.search(r'name="csrf-token" content="([0-9a-f]+)"', page.text)
+    assert match, page.text[:500]
+    return match.group(1)

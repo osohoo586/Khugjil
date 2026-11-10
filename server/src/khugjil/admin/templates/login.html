@@ -1,0 +1,12 @@
+{% extends "base_public.html" %}
+{% block title %}Нэвтрэх{% endblock %}
+{% block content %}
+<h1>Нэвтрэх</h1>
+{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/login" class="stack">
+  <label class="field"><span class="field-label">Нэвтрэх нэр</span><input name="login_name" autocomplete="username" required maxlength="120"></label>
+  <label class="field"><span class="field-label">Нууц үг</span><input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
+  <button class="btn btn-primary" type="submit">Үргэлжлүүлэх</button>
+</form>
+<p class="muted small">Нууц үгээ мартсан бол байгууллагынхаа эзэмшигчээс шинэ урилга авна уу.</p>
+{% endblock %}

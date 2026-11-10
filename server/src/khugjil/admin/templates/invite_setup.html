@@ -1,0 +1,27 @@
+{% extends "base_public.html" %}
+{% block title %}Бүртгэл үүсгэх{% endblock %}
+{% block content %}
+<h1>Бүртгэл үүсгэх</h1>
+<p>{{ view.tenant_name }} — {{ view.display_name }} ({{ view.role | role }})</p>
+{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/invite/setup" class="stack">
+  <label class="field"><span class="field-label">Нэвтрэх нэр</span>
+    <input name="login_name" required minlength="3" maxlength="60" pattern="[A-Za-z0-9._@-]+" autocomplete="username">
+    <span class="field-hint">Латин үсэг, тоо болон . _ @ - тэмдэгт ашиглана.</span></label>
+  <label class="field"><span class="field-label">Нууц үг</span>
+    <input name="password" type="password" required minlength="12" maxlength="200" autocomplete="new-password">
+    <span class="field-hint">Дор хаяж 12 тэмдэгт.</span></label>
+  <label class="field"><span class="field-label">Нууц үг дахин</span>
+    <input name="password2" type="password" required minlength="12" maxlength="200" autocomplete="new-password"></label>
+  {% if terms %}
+  <section class="terms" aria-label="Үйлчилгээний нөхцөл"><pre class="doc">{{ terms }}</pre></section>
+  <label class="check"><input type="checkbox" name="accept_terms" value="true" required> Үйлчилгээний нөхцөлийг зөвшөөрч байна.</label>
+  <label class="check"><input type="checkbox" name="staff_sharing" value="true" required> Энэ мэдээллийг ажилтнуудтайгаа хуваалцах эрхтэй гэдгээ баталж байна.</label>
+  {% endif %}
+  {% if view.role in ("owner", "admin") %}
+  <details class="terms"><summary>Ээлжинд гарч мэдэгдэл авах бол</summary><pre class="doc">{{ view.consent_text }}</pre></details>
+  <label class="check"><input type="checkbox" name="member_consent" value="true"> Би ээлжинд гарч мэдэгдэл авахыг зөвшөөрч байна (заавал биш).</label>
+  {% endif %}
+  <button class="btn btn-primary" type="submit">Үргэлжлүүлэх</button>
+</form>
+{% endblock %}

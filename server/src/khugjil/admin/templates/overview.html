@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Тойм{% endblock %}
+{% block content %}
+<h1>Тойм</h1>
+<div class="cards">
+  <section class="card">
+    <h2 class="card-title">Банкны имэйл</h2>
+    <p class="card-value">{% if last_ok %}Сүүлд ирсэн {{ last_ok | hm }}{% else %}Одоогоор ирээгүй{% endif %}</p>
+    <p>{% if forwarding_ok %}{{ ui.badge("success", "Хэвийн") }}{% else %}{{ ui.badge("warning", "Шалгах шаардлагатай") }}{% endif %}</p>
+  </section>
+  <section class="card">
+    <h2 class="card-title">Онлайн төхөөрөмж</h2>
+    <p class="card-value tabular">{{ devices_online }} / {{ devices_total }}</p>
+    {% if offline_names %}<p class="muted">Офлайн: {{ offline_names | join(", ") }}</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2 class="card-title">Амжилтгүй илгээлт</h2>
+    <p class="card-value tabular">{{ failed }}</p>
+    <p class="muted">Сүүлийн 24 цаг</p>
+  </section>
+</div>
+<section>
+  <h2>Өнөөдөр</h2>
+  <p class="today"><span class="tabular">{{ today_count }} гүйлгээ</span><span class="tabular num">{{ today_total | amount }}</span></p>
+</section>
+<section>
+  <h2>Анхаарах асуудал</h2>
+  {% if problems %}
+  <table class="table">
+    <thead><tr><th>Асуудал</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+    <tbody>
+    {% for text, href in problems %}<tr><td>{{ text }}</td><td class="num"><a href="{{ href }}">Юу хийх вэ</a></td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {{ ui.empty("Анхаарах асуудал алга", "Бүх зүйл хэвийн ажиллаж байна.") }}
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base_public.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Компонентууд{% endblock %}
+{% block content %}
+<h1>Компонентуудын жагсаалт</h1>
+<p class="muted">Зөвхөн хөгжүүлэлтийн орчинд. Бүх компонентыг бүх төлөвт нь харуулна.</p>
+<h2>Товч</h2>
+<p class="row-form"><button class="btn btn-primary">Үндсэн</button><button class="btn btn-secondary">Хоёрдогч</button><button class="btn btn-danger">Цуцлах</button><button class="btn btn-primary" disabled>Идэвхгүй</button><button class="btn btn-link">Холбоос</button></p>
+<h2>Тэмдэглэгээ</h2>
+<p>{{ ui.badge("success", "Хэвийн") }} {{ ui.badge("warning", "Анхааруулга") }} {{ ui.badge("error", "Алдаа") }} {{ ui.badge("neutral", "Идэвхгүй") }}</p>
+<h2>Мэдэгдэл</h2>
+<p class="notice notice-success">Хадгаллаа.</p><p class="notice notice-error">Алдаа гарлаа. Дахин оролдоно уу.</p>
+<h2>Талбар</h2>
+<form class="stack narrow"><label class="field"><span class="field-label">Нэр</span><input value="Касс-3"><span class="field-hint">Тайлбар текст</span></label>
+<label class="field"><span class="field-label">Алдаатай</span><input aria-invalid="true" value="12"></label><label class="check"><input type="checkbox" checked> Сонголт</label></form>
+<h2>Хүснэгт</h2>
+<table class="table"><thead><tr><th>Огноо, цаг</th><th>Данс</th><th class="num">Дүн</th><th>Утга</th></tr></thead>
+<tbody>{% for r in rows %}<tr><td class="tabular">{{ r.txn_at | dt }}</td><td>{{ r.account }}</td><td class="num tabular">{{ r.amount | amount(r.currency) }}</td><td class="truncate" title="{{ r.description }}">{{ r.description }}</td></tr>{% endfor %}</tbody></table>
+<h2>Хоосон төлөв</h2>{{ ui.empty("Гүйлгээ олдсонгүй", "Шүүлтүүрээ өөрчилж дахин хайна уу.") }}
+<h2>QR</h2>{{ ui.qr("https://app.example/pair#t=demo", "Жишээ QR") }}
+{% endblock %}

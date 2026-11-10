@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Дансууд{% endblock %}
+{% block content %}
+<h1>Дансууд</h1>
+{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+{% if accounts %}
+<table class="table">
+  <thead><tr><th>Товч нэр</th><th>Данс</th><th>Төлөв</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <tbody>
+  {% for a in accounts %}
+  <tr>
+    <td>
+      <form method="post" action="/accounts/{{ a.id }}" class="inline-edit">
+        {{ ui.csrf() }}
+        <input name="alias" value="{{ a.alias }}" maxlength="60" aria-label="Товч нэр" required>
+        <input type="hidden" name="status" value="{{ a.status }}">
+        <button class="btn btn-secondary btn-sm" type="submit">Хадгалах</button>
+      </form>
+    </td>
+    <td class="tabular">••{{ suffix[a.id] }}</td>
+    <td>{% if a.status == "active" %}{{ ui.badge("success", "Идэвхтэй") }}{% else %}{{ ui.badge("neutral", "Идэвхгүй") }}{% endif %}</td>
+    <td class="num">
+      <form method="post" action="/accounts/{{ a.id }}" class="inline" data-confirm="{{ a.alias }} дансыг {{ 'идэвхгүй болгох' if a.status == 'active' else 'идэвхжүүлэх' }} уу?">
+        {{ ui.csrf() }}
+        <input type="hidden" name="alias" value="{{ a.alias }}">
+        <input type="hidden" name="status" value="{{ 'inactive' if a.status == 'active' else 'active' }}">
+        <button class="btn btn-{{ 'danger' if a.status == 'active' else 'secondary' }} btn-sm" type="submit">{{ "Идэвхгүй болгох" if a.status == "active" else "Идэвхжүүлэх" }}</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+{{ ui.empty("Данс бүртгэгдээгүй байна", "Орлого хүлээн авах дансаа доор нэмнэ үү.") }}
+{% endif %}
+<h2>Данс нэмэх</h2>
+<form method="post" action="/accounts" class="row-form">
+  {{ ui.csrf() }}
+  {{ ui.field("number", "Дансны дугаар", type="text", required=True, attrs={"inputmode": "numeric", "maxlength": "40", "autocomplete": "off"}) }}
+  {{ ui.field("alias", "Товч нэр", hint="Жишээ нь Төв дэлгүүр", required=True, attrs={"maxlength": "60"}) }}
+  <button class="btn btn-primary" type="submit">Нэмэх</button>
+</form>
+<p class="muted small">Дансны дугаарыг шифрлэж хадгалах ба зөвхөн сүүлийн 4 оронг харуулна.</p>
+{% endblock %}

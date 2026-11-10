@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Telegram холбох{% endblock %}
+{% block content %}
+<h1>Telegram холбох</h1>
+<p>Утсаараа доорх QR кодыг уншуулах эсвэл холбоосыг нээгээд ботод «Start» дарна уу. Дараа нь бот зөвшөөрөл асууна. Код 10 минутын дотор нэг удаа ажиллана.</p>
+<div class="copy-row"><code id="tg-link" class="wrap">{{ link }}</code> <button type="button" class="btn btn-secondary btn-sm" data-copy="tg-link">Хуулах</button></div>
+{{ ui.qr(link, "Telegram холбох QR код") }}
+<p><a href="/members">Буцах</a></p>
+{% endblock %}

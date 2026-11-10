@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ group.name }}{% endblock %}
+{% block content %}
+<p><a href="/groups">‹ Бүлгүүд</a></p>
+<h1>{{ group.name }}</h1>
+<form method="post" action="/groups/{{ group.id }}" class="stack">
+  {{ ui.csrf() }}
+  <div class="row-form">
+    {{ ui.field("name", "Нэр", value=group.name, required=True, attrs={"maxlength": "60"}) }}
+    <label class="field"><span class="field-label">Төлөв</span>
+      <select name="status"><option value="active"{% if group.status == "active" %} selected{% endif %}>Идэвхтэй</option><option value="inactive"{% if group.status != "active" %} selected{% endif %}>Идэвхгүй</option></select></label>
+  </div>
+  <div class="columns">
+    <fieldset><legend>Дансууд</legend>{% for a in accounts %}<label class="check"><input type="checkbox" name="account_ids" value="{{ a.id }}"{% if a.id in sel_a %} checked{% endif %}> {{ a.alias }}</label>{% else %}<p class="muted">Данс алга.</p>{% endfor %}</fieldset>
+    <fieldset><legend>Хэрэглэгчид</legend>{% for m in members %}<label class="check"><input type="checkbox" name="member_ids" value="{{ m.id }}"{% if m.id in sel_m %} checked{% endif %}> {{ m.display_name }} <span class="muted">({{ m.role | role }})</span></label>{% else %}<p class="muted">Хэрэглэгч алга.</p>{% endfor %}</fieldset>
+    <fieldset><legend>Төхөөрөмжүүд</legend>{% for d in devices %}<label class="check"><input type="checkbox" name="device_ids" value="{{ d.id }}"{% if d.id in sel_d %} checked{% endif %}> {{ d.name }}</label>{% else %}<p class="muted">Төхөөрөмж алга.</p>{% endfor %}</fieldset>
+  </div>
+  <p><button class="btn btn-primary" type="submit">Хадгалах</button></p>
+</form>
+{% endblock %}

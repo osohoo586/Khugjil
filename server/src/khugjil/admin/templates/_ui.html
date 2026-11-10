@@ -1,0 +1,38 @@
+{# Shared components. Everything is autoescaped; nothing here renders raw HTML. #}
+{% macro csrf() %}<input type="hidden" name="csrf" value="{{ ctx.csrf }}">{% endmacro %}
+
+{% macro confirm_form(action, label, message, kind="danger") %}
+<form method="post" action="{{ action }}" class="inline" data-confirm="{{ message }}">
+  {{ csrf() }}
+  <button type="submit" class="btn btn-{{ kind }} btn-sm">{{ label }}</button>
+</form>
+{% endmacro %}
+
+{% macro badge(kind, text) %}<span class="badge badge-{{ kind }}">{{ text }}</span>{% endmacro %}
+
+{% macro empty(title, hint) %}
+<div class="empty"><p class="empty-title">{{ title }}</p><p class="muted">{{ hint }}</p></div>
+{% endmacro %}
+
+{% macro qr(data, label) %}
+{% set q = qr_path(data) %}
+<svg class="qr" viewBox="0 0 {{ q[0] }} {{ q[0] }}" role="img" aria-label="{{ label }}" shape-rendering="crispEdges"><path d="{{ q[1] }}"/></svg>
+{% endmacro %}
+
+{% macro pager(page, pages, base) %}
+{% if pages > 1 %}
+<nav class="pager" aria-label="Хуудаслалт">
+  {% if page > 1 %}<a href="{{ base }}page={{ page - 1 }}">‹ Өмнөх</a>{% else %}<span class="muted">‹ Өмнөх</span>{% endif %}
+  <span class="tabular">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="{{ base }}page={{ page + 1 }}">Дараах ›</a>{% else %}<span class="muted">Дараах ›</span>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro field(name, label, value="", type="text", hint=None, required=False, attrs={}) %}
+<label class="field">
+  <span class="field-label">{{ label }}</span>
+  <input type="{{ type }}" name="{{ name }}" value="{{ value }}"{% if required %} required{% endif %}{% for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+  {% if hint %}<span class="field-hint">{{ hint }}</span>{% endif %}
+</label>
+{% endmacro %}

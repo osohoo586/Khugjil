@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ member.display_name }}{% endblock %}
+{% block content %}
+<p><a href="/members">‹ Хэрэглэгчид</a></p>
+<h1>{{ member.display_name }}</h1>
+<form method="post" action="/members/{{ member.id }}" class="stack narrow">
+  {{ ui.csrf() }}
+  {{ ui.field("display_name", "Нэр", value=member.display_name, required=True, attrs={"maxlength": "60"}) }}
+  <label class="field"><span class="field-label">Үүрэг</span><select name="role">{% for r in roles %}<option value="{{ r }}"{% if r == member.role %} selected{% endif %}>{{ r | role }}</option>{% endfor %}</select></label>
+  <fieldset><legend>Бүлэг</legend>{% for g in groups %}<label class="check"><input type="checkbox" name="group_ids" value="{{ g.id }}"{% if g.id in selected %} checked{% endif %}> {{ g.name }}</label>{% endfor %}</fieldset>
+  <button class="btn btn-primary" type="submit">Хадгалах</button>
+</form>
+<h2>Ажлын хуваарь</h2>
+<p class="muted">Хуваарь тохируулсан бол зөвхөн энэ цагт мэдэгдэл авна. Хуваарь дуусахад ээлж автоматаар дуусна.</p>
+{% if windows %}
+<table class="table"><thead><tr><th>Гараг</th><th>Цаг</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead><tbody>
+{% for w in windows %}<tr><td>{{ WEEKDAYS[w.weekday] }}</td><td class="tabular">{{ w.start_local.strftime("%H:%M") }}–{{ w.end_local.strftime("%H:%M") }}</td>
+<td class="num">{{ ui.confirm_form("/members/" ~ member.id ~ "/schedule/" ~ w.id ~ "/delete", "Устгах", WEEKDAYS[w.weekday] ~ " гарагийн хуваарийг устгах уу?") }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}{{ ui.empty("Хуваарьгүй", "Хуваарьгүй хэрэглэгч ээлж нээлттэй үед бүх цагт мэдэгдэл авна.") }}{% endif %}
+<form method="post" action="/members/{{ member.id }}/schedule" class="row-form">
+  {{ ui.csrf() }}
+  <label class="field"><span class="field-label">Гараг</span><select name="weekday">{% for d in WEEKDAYS %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}</select></label>
+  {{ ui.field("start", "Эхлэх", value="09:00", type="time", required=True) }}
+  {{ ui.field("end", "Дуусах", value="21:00", type="time", required=True) }}
+  <button class="btn btn-secondary" type="submit">Нэмэх</button>
+</form>
+{% endblock %}

@@ -13,7 +13,7 @@ from uuid import UUID
 
 import redis.asyncio as aioredis
 
-ALLOWED_EVENTS = frozenset({"txn", "shift_ended", "device_revoked", "settings_changed"})
+ALLOWED_EVENTS = frozenset({"txn", "shift_ended", "device_revoked", "settings_changed", "test"})
 
 
 def device_channel(device_id: UUID) -> str:

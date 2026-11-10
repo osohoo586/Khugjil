@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Имэйл холболт{% endblock %}
+{% block content %}
+<h1>Имэйл холболт</h1>
+{% if notice == "test" %}<p class="notice notice-success" role="status">Туршилтын мэдэгдэл илгээлээ. Ээлжтэй төхөөрөмж болон таны Telegram дээр «Туршилт» гэсэн мэдэгдэл харагдах ёстой.</p>{% endif %}
+<section>
+  <h2>Хүлээн авах хаяг</h2>
+  {% if address %}
+  <div class="copy-row"><code id="inbound" class="wrap">{{ address }}</code>
+    <button type="button" class="btn btn-secondary btn-sm" data-copy="inbound">Хуулах</button>
+    {{ ui.confirm_form("/email/rotate", "Шинэ хаяг", "Шинэ хаяг үүсгэх үү? Хуучин хаяг шууд хүчингүй болох тул Gmail-ийн дамжуулалтыг шинэ хаяг руу дахин тохируулах шаардлагатай.", "secondary") }}</div>
+  <p class="muted small">Энэ хаягийг нууцлана уу. Хэн нэгэнд задарсан гэж үзвэл шинэ хаяг үүсгэнэ үү.</p>
+  {% else %}
+  {{ ui.empty("Хаяг алга", "Шинэ хаяг үүсгэнэ үү.") }}
+  {% endif %}
+  <div hx-get="/email/status" hx-trigger="every 15s" hx-swap="innerHTML">{% include "_email_status.html" %}</div>
+</section>
+<section>
+  <h2>Gmail тохируулах</h2>
+  <ol class="steps">
+    <li><strong>Дамжуулах хаяг нэмэх.</strong> Gmail → Тохиргоо → «Дамжуулалт ба POP/IMAP» → «Дамжуулах хаяг нэмэх» хэсэгт дээрх хаягийг оруулна. <span class="placeholder">[зураг]</span></li>
+    <li><strong>Баталгаажуулах код.</strong>
+      {% if fwd_code %}Gmail-ээс ирсэн код: <strong class="code tabular">{{ fwd_code }}</strong> <span class="muted">({{ fwd_expires | dt }} хүртэл хүчинтэй)</span>. Энэ кодыг Gmail-ийн тохиргоонд оруулна уу.
+      {% else %}Gmail баталгаажуулах имэйл илгээсний дараа код энд харагдана. Хуудас өөрөө шинэчлэгдэнэ.{% endif %}</li>
+    <li><strong>Шүүлтүүр үүсгэх.</strong> Gmail → Тохиргоо → «Шүүлтүүр» → «Шинэ шүүлтүүр»: From = {{ bank_senders | join(", ") }}. «Дамжуулах» сонголтоор дээрх хаягийг сонгоно. Зөвхөн банкны гүйлгээний мэдэгдэл дамжуулна уу. <span class="placeholder">[зураг]</span></li>
+    <li><strong>Шалгах.</strong> Доорх товчоор туршилтын мэдэгдэл илгээж, кассын дэлгэц дээр харагдаж байгааг шалгана.
+      <form method="post" action="/email/test" class="inline">{{ ui.csrf() }}<button class="btn btn-secondary btn-sm" type="submit">Тест илгээх</button></form></li>
+  </ol>
+</section>
+<section>
+  <h2>Сүүлд ирсэн имэйлүүд</h2>
+  <p class="muted small">Имэйлийн агуулгыг хадгалдаггүй. Зөвхөн ирсэн цаг болон үр дүнг харуулна.</p>
+  {% if events %}
+  <table class="table"><thead><tr><th>Цаг</th><th>Үр дүн</th></tr></thead><tbody>
+  {% for at, label in events %}<tr><td class="tabular">{{ at | dt }}</td><td>{{ label }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}{{ ui.empty("Имэйл ирээгүй байна", "Gmail-ийн дамжуулалт ба шүүлтүүрээ дээрх алхмаар тохируулна уу.") }}{% endif %}
+</section>
+{% endblock %}

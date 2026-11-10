@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Төхөөрөмжүүд{% endblock %}
+{% block content %}
+<h1>Төхөөрөмжүүд</h1>
+{% if devices %}
+<table class="table">
+  <thead><tr><th>Нэр</th><th>Төрөл</th><th>Бүлэг</th><th>Сүүлд</th><th>Төлөв</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <tbody>
+  {% for d in devices %}
+  <tr>
+    <td>{{ d.name }}</td>
+    <td>{{ "Веб" if d.kind == "web" else "Агент" }}</td>
+    <td>{{ (device_groups.get(d.id) or ["—"]) | join(", ") }}</td>
+    <td class="tabular">{{ d.last_seen_at | hm }}</td>
+    <td>{% if online[d.id] %}{{ ui.badge("success", "Онлайн") }}{% else %}{{ ui.badge("neutral", "Офлайн") }}{% endif %}
+        {% if on_shift.get(d.id) %}<span class="small"> · {{ on_shift[d.id] }}</span>{% else %}<span class="small muted"> · ээлжгүй</span>{% endif %}</td>
+    <td class="num actions"><a href="/devices/{{ d.id }}">Засах</a>
+      {{ ui.confirm_form("/devices/" ~ d.id ~ "/revoke", "Цуцлах", d.name ~ " төхөөрөмжийг цуцлах уу? Холболт шууд тасарч, дахин холбохдоо шинэ код шаардлагатай.") }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+{{ ui.empty("Төхөөрөмж холбогдоогүй байна", "Кассын компьютер эсвэл утсаа доорх маягтаар холбоно уу.") }}
+{% endif %}
+<h2>Төхөөрөмж холбох</h2>
+<form method="post" action="/devices/pair" class="stack narrow" hx-post="/devices/pair" hx-target="#htmx-dialog" hx-swap="innerHTML">
+  {{ ui.csrf() }}
+  {{ ui.field("device_name", "Нэр", hint="Жишээ нь Касс-3", required=True, attrs={"maxlength": "60"}) }}
+  <fieldset><legend>Бүлэг</legend>{% for g in groups %}<label class="check"><input type="checkbox" name="group_ids" value="{{ g.id }}"> {{ g.name }}</label>{% else %}<p class="muted">Эхлээд бүлэг үүсгэнэ үү.</p>{% endfor %}</fieldset>
+  <button class="btn btn-primary" type="submit">Код үүсгэх</button>
+</form>
+{% endblock %}

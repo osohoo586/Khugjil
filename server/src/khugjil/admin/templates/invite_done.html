@@ -1,0 +1,8 @@
+{% extends "base_public.html" %}
+{% block title %}Бүртгэл үүслээ{% endblock %}
+{% block content %}
+<h1>Бүртгэл үүслээ</h1>
+<p>Доорх нөөц кодуудыг хэвлэж эсвэл бичиж аюулгүй газар хадгална уу. Утсаа алдвал эдгээрийн аль нэгээр нэвтэрнэ. Код бүрийг нэг удаа ашиглана. Энэ жагсаалтыг дахин харуулахгүй.</p>
+<ol class="codes tabular">{% for c in codes %}<li>{{ c }}</li>{% endfor %}</ol>
+<p><a class="btn btn-primary" href="/">Хадгалсан, үргэлжлүүлэх</a></p>
+{% endblock %}

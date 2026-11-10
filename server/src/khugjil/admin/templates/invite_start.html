@@ -1,0 +1,14 @@
+{% extends "base_public.html" %}
+{% block title %}Урилга{% endblock %}
+{% block content %}
+<h1>Урилга хүлээн авах</h1>
+{% if error %}
+<p class="notice notice-error" role="alert">{{ error }}</p>
+{% else %}
+<p>Урилгын холбоосыг шалгаж байна. Хэрэв хуудас шилжихгүй бол доорх товчийг дарна уу.</p>
+<form method="post" action="/invite/start" id="invite-start" class="stack">
+  <input type="hidden" name="token" id="invite-token" value="">
+  <button class="btn btn-primary" type="submit">Үргэлжлүүлэх</button>
+</form>
+{% endif %}
+{% endblock %}
