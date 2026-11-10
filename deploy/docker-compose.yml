@@ -1,0 +1,108 @@
+# Production stack. Create the env file next to this compose file yourself (variable list:
+# docs/configuration.md); never commit it. Only ports 25 (SMTP) and 443 (HTTPS) are published.
+# PostgreSQL and Redis live on an internal network with no route to the internet.
+name: khugjil
+
+x-app: &app
+  build: ../server
+  image: khugjil/server:local
+  env_file: .env
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+  restart: unless-stopped
+  networks: [backend, egress]
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    migrate: { condition: service_completed_successfully }
+  logging:
+    driver: journald
+    options: { tag: "khugjil-{{.Name}}" }
+
+services:
+  caddy:
+    build: { context: .., dockerfile: deploy/Dockerfile.caddy }
+    environment:
+      KHJ_DOMAIN: ${KHJ_DOMAIN:?set KHJ_DOMAIN in the env file}
+    ports: ["443:443"]
+    volumes: [caddy_data:/data, caddy_config:/config]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=16m"]
+    restart: unless-stopped
+    networks: [egress]
+    logging: { driver: journald, options: { tag: "khugjil-caddy" } }
+
+  api:
+    <<: *app
+
+  smtp:
+    <<: *app
+    command: ["khugjil", "smtp"]
+    ports: ["25:2525"]
+    volumes: ["caddy_data:/certs:ro"]
+
+  worker:
+    <<: *app
+    command: ["khugjil", "worker"]
+
+  migrate:
+    build: ../server
+    image: khugjil/server:local
+    env_file: .env
+    command: ["khugjil", "migrate"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=16m"]
+    restart: "no"
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: ${KHJ_POSTGRES_SUPERUSER_PASSWORD:?set in the env file}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres:/init:ro
+    read_only: true
+    tmpfs: ["/tmp", "/var/run/postgresql"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${KHJ_REDIS_PASSWORD:?set in the env file}"]
+    environment:
+      REDISCLI_AUTH: ${KHJ_REDIS_PASSWORD}
+    volumes: [redisdata:/data]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+networks:
+  backend:
+    internal: true
+  egress: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  pgdata: {}
+  redisdata: {}

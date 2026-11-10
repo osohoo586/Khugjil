@@ -42,6 +42,7 @@ from khugjil.db.models import (
 )
 from khugjil.db.tenancy import tenant_session
 from khugjil.delivery.service import ack, notification_for
+from khugjil.logs import get_logger
 from khugjil.ratelimit import RateLimiter
 from khugjil.runtime import Runtime
 from khugjil.services.consent import give_consent
@@ -172,6 +173,7 @@ async def pair(body: PairBody, request: Request, response: Response, rt: Rt) -> 
             rt.sm, rt.crypto, token=body.token, short_code=body.code, now=utcnow()
         )
     except PairingError:
+        get_logger().warning("cashier.pair_failed", peer_ip=ip)
         raise fail(400, "invalid_code") from None
     set_device_cookie(response, paired.token)
     return {"paired": True}

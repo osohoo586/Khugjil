@@ -137,6 +137,36 @@
   --on-accent: #0c1420;
 }
 
+/* Admin panel follows the OS preference; the cashier view pins data-theme="light". */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181b;
+    --bg-subtle: #1c2024;
+    --surface: #1c2024;
+    --border: #353b42;
+    --border-strong: #5a626b;
+    --text: #e9ecef;
+    --text-muted: #a9b1b9;
+    --row-hover: #23282d;
+    --accent: #5fb487;
+    --accent-strong: #79c49b;
+    --accent-tint: #1d3227;
+    --on-accent: #0d1a12;
+    --success: #6cc68d;
+    --success-tint: #1b3123;
+    --warning: #e3b55a;
+    --warning-tint: #33291a;
+    --error: #f08a80;
+    --error-tint: #3a1f1c;
+}
+  :root:not([data-theme="light"])[data-accent="navy"] {
+    --accent: #8fb0dc;
+    --accent-strong: #a9c3e6;
+    --accent-tint: #1d2738;
+    --on-accent: #0c1420;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root { --motion: 0ms; }
 }

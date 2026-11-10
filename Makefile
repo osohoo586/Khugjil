@@ -27,7 +27,7 @@ cashier-check:
 	cd cashier && npm run lint && npm run typecheck && npm test && npm audit --audit-level=moderate
 
 e2e:
-	cd e2e && npx playwright test
+	cd e2e && npm test
 
 sync-assets:          ## copy shared design tokens + fonts into the admin static folder
 	mkdir -p server/src/khugjil/admin/static/shared/fonts

@@ -189,8 +189,8 @@ export class CashierApp {
   private setConnected(ok: boolean): void {
     this.connected = ok;
     if (this.refs.status) {
-      replace(this.refs.status, ok ? "Холбогдсон" : "Холболт тасарсан");
-      this.refs.status.className = ok ? "status ok" : "status bad";
+      replace(this.refs.status, ok ? "Холбогдсон" : "Дахин холбогдож байна…");
+      this.refs.status.className = ok ? "status ok" : "status wait";
     }
     if (ok) {
       if (this.disconnectTimer) clearTimeout(this.disconnectTimer);
@@ -198,7 +198,12 @@ export class CashierApp {
       if (this.refs.banner) this.refs.banner.hidden = true;
     } else if (!this.disconnectTimer) {
       this.disconnectTimer = setTimeout(() => {
-        if (!this.connected && this.refs.banner) this.refs.banner.hidden = false;
+        if (this.connected) return;
+        if (this.refs.banner) this.refs.banner.hidden = false;
+        if (this.refs.status) {
+          replace(this.refs.status, "Холболт тасарсан");
+          this.refs.status.className = "status bad";
+        }
       }, DISCONNECT_BANNER_MS);
     }
   }

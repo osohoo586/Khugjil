@@ -64,7 +64,7 @@ export function txnList(items: Txn[], showAccount: boolean): HTMLElement {
       h("td", { class: "num tabular" }, t.amount_text),
       h("td", { class: "truncate", title: t.description }, t.description),
     );
-    if (showAccount) row.append(h("td", {}, t.account_alias ?? ""));
+    if (showAccount) row.append(h("td", { class: "acct", title: t.account_alias ?? "" }, t.account_alias ?? ""));
     body.append(row);
   }
   return h("section", { class: "list" }, h("table", { class: "table" }, h("thead", {}, head), body));

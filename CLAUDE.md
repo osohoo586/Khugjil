@@ -4,25 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-`SPEC.md` is the authoritative spec for a multi-tenant **Khan Bank income notifier**; `PLAN.md` is the approved design (architecture, data model, threat model, open questions Q1–Q36). Phase 1 is being implemented on the `phase1` branch. This file summarizes the parts that are easiest to get wrong; when they disagree, `SPEC.md` wins.
+`SPEC.md` is the authoritative spec for a multi-tenant **Khan Bank income notifier**; `PLAN.md` is the approved design (architecture, data model, threat model, open questions Q1–Q36). Phase 1 is implemented on the `phase1` branch; Phase 2 (desktop agent) has not been approved. The Khan Bank placeholders (Q1–Q3) and the real email layout (Q6, Q8, Q9, Q11) are still unknown: everything is built and tested against fake values. This file summarizes the parts that are easiest to get wrong; when they disagree, `SPEC.md` wins.
 
 ## Commands
 
-Run from the repo root unless noted. Tests need the throwaway Postgres/Redis containers.
+Run from the repo root unless noted. Server tests need the throwaway Postgres/Redis containers.
 
 ```sh
 make services                  # start test Postgres (127.0.0.1:55442) + Redis (:56389)
 make lint typecheck security   # ruff + format check, mypy --strict, bandit + pip-audit
 make test                      # full pytest suite
 make coverage                  # tests + per-package ≥95% gate (scripts/coverage_gate.py)
+make cashier-check             # cashier: eslint, tsc (app + service worker), vitest, npm audit
+make e2e                       # Playwright screenshots (builds cashier, renders admin fixtures)
+make sync-assets               # after editing shared/tokens.css or shared/fonts
 cd server && uv run pytest tests/unit/test_foundation.py::test_tokens   # single test
 cd server && uv run pytest -m "invariant"                                # SPEC §3 invariant tests only
+cd cashier && npx vitest run src/format.test.ts                         # single cashier test file
 ```
 
-- Python deps are managed with `uv` (`server/uv.lock`); never pip-install into the project.
-- pytest runs with sockets disabled except localhost (pytest-socket); DKIM DNS goes through a stub in tests.
-- Invariant tests live in `server/tests/invariants/` and are `xfail(strict=True)` until the feature that enforces them lands; remove the marker in the same commit as the feature.
-- Writing `.env*` files is blocked by the user's permission settings, and a hook blocks Bash commands that mention `.env`. Configuration variables are documented in `docs/configuration.md`; the user creates the env file themselves.
+- Python deps are managed with `uv` (`server/uv.lock`); never pip-install into the project. The cashier pins exact npm versions and overrides `minimatch` to a patched release.
+- pytest runs with sockets disabled except localhost (pytest-socket); DKIM DNS goes through a stub in tests. Tests use `tests/fixtures/world.py` (a migrated DB, app role under RLS, per-test tenant "worlds") and `tests/fixtures/api.py` (in-process HTTP harness for both hosts).
+- Every SPEC §3 invariant has tests in `server/tests/invariants/`; none are xfail any more. New features touching an invariant must extend those tests.
+- Shared amount/time formatting is pinned by `shared/format_vectors.json`, used by both pytest and vitest.
+- Writing `.env*` files is blocked by the user's permission settings, and a hook blocks Bash commands that mention `.env` (write such text with the Write tool). Configuration variables are documented in `docs/configuration.md`; the user creates the env file themselves and never pastes secrets or real bank emails into chat.
+
+## Code map
+
+- `server/src/khugjil/ingest/`: `checks.evaluate()` is the pure b–g pipeline; `pipeline.ingest()` adds check a and persistence; `smtp.py` and `api_v1/hooks.py` are the two transports.
+- `server/src/khugjil/db/`: models + migration `0001` (authoritative DDL, RLS policies, SECURITY DEFINER lookups). All tenant data access goes through `tenancy.tenant_session()`; cross-tenant lookups only through `tenancy.Resolver`.
+- `server/src/khugjil/routing/eligibility.py` (pure) + `delivery/service.py` (fanout/send with re-check) + `delivery/channels.py` (SSE, Web Push, Telegram).
+- `server/src/khugjil/web/app.py` dispatches by Host to the cashier API (`api_v1/`) and the admin panel (`admin/`).
+- `cashier/src/` is framework-free TypeScript; `dom.h()` is the only way to build elements (ESLint bans innerHTML).
 
 ## Required workflow (SPEC §12)
 
@@ -33,13 +46,13 @@ cd server && uv run pytest -m "invariant"                                # SPEC 
 5. Never put real account numbers, names or emails in code, tests, fixtures or commits. Use only fake data, like the sample in SPEC §4.
 6. A `README.md` is required, with parts in Mongolian: the Gmail filter guide and cashier PC setup, including the Windows 11 full-screen notification limitation.
 
-## Planned stack (SPEC §11)
+## Stack (SPEC §11)
 
 - **Server:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, PostgreSQL, Redis + arq (background jobs), aiosmtpd (inbound SMTP on :25), pywebpush (VAPID), pydantic-settings, structlog with a redaction filter, libsodium field encryption.
 - **Admin panel:** server-rendered Jinja + HTMX.
 - **Cashier view:** a standalone TypeScript + Vite static bundle served by Caddy, with minimal dependencies and no UI kit. It must stay decoupled from server rendering so a Tauri shell can load it unchanged later.
 - **Ops:** Docker Compose, Caddy for TLS, non-root containers with read-only filesystems, only ports 25 and 443 exposed.
-- **CI gates:** `ruff`, `mypy --strict`, `bandit`, `pip-audit`, `npm audit`, `pytest`, Playwright screenshot tests. Coverage must be **≥95%** on the parser, filters, routing, consent, on-duty logic and tenant isolation. Add the concrete commands (lint, typecheck, the full test suite, a single test) to this file once the project is scaffolded.
+- **CI gates:** `ruff`, `mypy --strict`, `bandit`, `pip-audit`, `npm audit`, `pytest`, Playwright screenshot tests. Coverage must be **≥95%** on the parser, filters, routing, consent, on-duty logic and tenant isolation.
 
 ## Architecture: the email pipeline
 

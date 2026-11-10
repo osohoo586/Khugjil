@@ -37,6 +37,7 @@ from khugjil.auth.sessions import create_session, end_session, mark_stepped_up
 from khugjil.crypto import field_aad, new_token, token_hash
 from khugjil.db.models import Member, RecoveryCode, TenantTermsAcceptance
 from khugjil.db.tenancy import tenant_session
+from khugjil.logs import get_logger
 from khugjil.ratelimit import RateLimiter
 from khugjil.runtime import Runtime
 from khugjil.services.consent import current_document, give_consent, render_document
@@ -106,6 +107,7 @@ async def login_submit(
     found = await rt.resolver.login(login_name.strip())
     if found is None:
         verify_secret(None, password)
+        get_logger().warning("admin.login_failed", peer_ip=ip)
         return page("login.html", 401, error=LOGIN_ERROR)
     tenant_id, member_id = found
     async with tenant_session(rt.sm, tenant_id) as s:
@@ -115,6 +117,7 @@ async def login_submit(
         if member.login_locked_until and member.login_locked_until > now:
             return page("login.html", 423, error="Түр хаагдсан байна. Дараа дахин оролдоно уу.")
         if not verify_secret(member.password_hash, password):
+            get_logger().warning("admin.login_failed", peer_ip=ip)
             member.login_failures += 1
             member.login_locked_until = lockout_until(member.login_failures, now)
             return page("login.html", 401, error=LOGIN_ERROR)

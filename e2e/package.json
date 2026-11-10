@@ -1,0 +1,13 @@
+{
+  "name": "khugjil-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixtures": "cd ../cashier && npm run build && cd ../server && uv run python ../e2e/render_admin.py ../e2e/admin-html",
+    "test": "npm run fixtures && playwright test",
+    "update": "npm run fixtures && playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
+}

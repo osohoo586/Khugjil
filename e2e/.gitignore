@@ -1,0 +1,4 @@
+node_modules/
+admin-html/
+test-results/
+playwright-report/

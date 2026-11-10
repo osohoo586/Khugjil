@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+# Caddy with the cashier bundle baked in. Build context: the repository root.
+FROM node:22-alpine AS cashier
+WORKDIR /src
+COPY shared ./shared
+COPY cashier/package.json cashier/package-lock.json ./cashier/
+RUN cd cashier && npm ci --ignore-scripts
+COPY cashier ./cashier
+RUN cd cashier && npm run build
+
+FROM caddy:2.10-alpine
+COPY --from=cashier /src/cashier/dist /srv/cashier
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
