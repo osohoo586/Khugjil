@@ -10,7 +10,6 @@ from typing import Any
 import pytest
 
 from tests.fixtures.emails import Mailer
-from tests.invariants.helpers import pending
 
 pytestmark = pytest.mark.invariant(10)
 
@@ -65,17 +64,14 @@ def targets(snap: Any) -> list[Any]:
     return eligible_targets(snap, NOW)
 
 
-@pending("routing")
 def test_active_consent_delivers() -> None:
     assert [(t.kind, t.target_id) for t in targets(snapshot())] == [("device", DEV)]
 
 
-@pending("routing")
 def test_no_consent_no_delivery() -> None:
     assert targets(snapshot(consents=())) == []
 
 
-@pending("routing")
 def test_revoked_consent_no_delivery() -> None:
     from khugjil.routing.model import ConsentState
 
@@ -83,13 +79,11 @@ def test_revoked_consent_no_delivery() -> None:
     assert targets(snapshot(consents=revoked)) == []
 
 
-@pending("routing")
 def test_outdated_consent_version_no_delivery() -> None:
     snap = replace(snapshot(), min_consent_version=2)
     assert targets(snap) == []
 
 
-@pending("routing")
 def test_telegram_consent_does_not_cover_devices() -> None:
     from khugjil.routing.model import ConsentState
 
@@ -97,7 +91,6 @@ def test_telegram_consent_does_not_cover_devices() -> None:
     assert targets(snapshot(consents=only_tg)) == []
 
 
-@pending("routing")
 def test_off_duty_by_schedule_no_delivery() -> None:
     from khugjil.routing.model import DutyWindow
 
@@ -106,7 +99,6 @@ def test_off_duty_by_schedule_no_delivery() -> None:
     assert targets(snapshot(duty=(DutyWindow(weekday=3, start=time(9), end=time(22)),)))
 
 
-@pending("delivery")
 @pytest.mark.db
 async def test_revocation_between_fanout_and_send_skips(world, mailer: Mailer) -> None:  # type: ignore[no-untyped-def]
     outcome = await world.ingest(mailer.bank_mail())
@@ -117,7 +109,6 @@ async def test_revocation_between_fanout_and_send_skips(world, mailer: Mailer) -
     assert statuses == {"skipped"}
 
 
-@pending("consent service")
 @pytest.mark.db
 async def test_revocation_ends_shift_and_push_subscriptions(world) -> None:  # type: ignore[no-untyped-def]
     await world.add_push_subscription()

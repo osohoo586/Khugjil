@@ -95,7 +95,6 @@ def test_huge_description_is_truncated(mailer: Mailer) -> None:
     assert len(r.description) == 200
 
 
-@pending("telegram")
 def test_telegram_payload_is_plain_text() -> None:
     from khugjil.delivery.telegram import send_message_payload
 

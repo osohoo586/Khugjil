@@ -10,6 +10,7 @@ import json
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from khugjil.crypto import Crypto
+from khugjil.crypto import Crypto, field_aad
 from khugjil.db.models import (
     Consent,
     Device,
@@ -29,12 +30,18 @@ from khugjil.db.models import (
     GroupAccount,
     GroupMember,
     Member,
+    PushSubscription,
     RecipientGroup,
     Shift,
 )
 from khugjil.db.tenancy import SessionMaker, make_engine, make_sessionmaker, tenant_session
+from khugjil.delivery.format import Notification
+from khugjil.delivery.notifier import SendResult, SendTarget
+from khugjil.delivery.service import DeliveryDeps, fanout, send
+from khugjil.events import RecordingEventBus
 from khugjil.ingest.dkim_arc import DnsFunc
 from khugjil.ingest.pipeline import IngestDeps, Outcome, ingest
+from khugjil.services.consent import revoke_consent
 from khugjil.services.provisioning import add_bank_account, create_tenant
 from khugjil.settings import Settings
 from tests.conftest import TEST_DATABASE_URL, TEST_REDIS_URL
@@ -209,6 +216,8 @@ class World:
     device_id: uuid.UUID
     shift_id: uuid.UUID
     enqueued: list[tuple[uuid.UUID, uuid.UUID]] = field(default_factory=list)
+    recorders: Recorders = field(default_factory=lambda: Recorders())
+    bus: RecordingEventBus = field(default_factory=RecordingEventBus)
 
     async def _enqueue(self, tenant_id: uuid.UUID, txn_id: uuid.UUID) -> None:
         self.enqueued.append((tenant_id, txn_id))
@@ -260,18 +269,65 @@ class World:
         async with tenant_session(self.db.sm, self.tenant_id) as s:
             return await add_bank_account(s, self.db.crypto, self.tenant_id, number, alias)
 
-    # Implemented with the delivery, consent and API steps.
-    async def fanout(self, txn_id: uuid.UUID) -> list[uuid.UUID]:
-        raise NotImplementedError
+    def delivery_deps(self) -> DeliveryDeps:
+        return DeliveryDeps(
+            crypto=self.db.crypto, sessionmaker=self.db.sm, notifiers=self.recorders.as_map()
+        )
 
-    async def send_all(self) -> list[Any]:
-        raise NotImplementedError
+    async def fanout(self, txn_id: uuid.UUID) -> list[uuid.UUID]:
+        return await fanout(self.delivery_deps(), self.tenant_id, txn_id)
+
+    async def send_all(self) -> list[tuple[str, uuid.UUID, Notification]]:
+        """Send every pending delivery of this tenant; returns what the notifiers received."""
+        before = len(self.recorders.sent)
+        pending = [r for r in await self.rows("delivery") if r["status"] == "pending"]
+        for row in pending:
+            await send(self.delivery_deps(), self.tenant_id, row["id"])
+        return self.recorders.sent[before:]
 
     async def revoke_consent(self, member_id: uuid.UUID) -> None:
-        raise NotImplementedError
+        await revoke_consent(
+            self.db.sm, self.bus, self.tenant_id, member_id, via="test", now=datetime.now(UTC)
+        )
 
     async def add_push_subscription(self) -> uuid.UUID:
-        raise NotImplementedError
+        crypto = self.db.crypto
+        async with tenant_session(self.db.sm, self.tenant_id) as s:
+            sub = PushSubscription(
+                tenant_id=self.tenant_id,
+                device_id=self.device_id,
+                member_id=self.member_id,
+                shift_id=self.shift_id,
+                endpoint_enc=crypto.encrypt(
+                    "https://push.example/sub/1",
+                    field_aad(self.tenant_id, "push_subscription", "endpoint_enc"),
+                ),
+                p256dh="test-p256dh",
+                auth_secret_enc=crypto.encrypt(
+                    "test-auth", field_aad(self.tenant_id, "push_subscription", "auth_secret_enc")
+                ),
+            )
+            s.add(sub)
+            await s.flush()
+            return sub.id
 
     async def api_transactions_json(self) -> str:
-        raise NotImplementedError
+        raise NotImplementedError  # implemented with the cashier API
+
+
+class RecordingNotifier:
+    def __init__(self, channel: str, sent: list[tuple[str, uuid.UUID, Notification]]) -> None:
+        self.channel = channel
+        self._sent = sent
+
+    async def send(self, target: SendTarget, note: Notification) -> SendResult:
+        self._sent.append((self.channel, target.target_id, note))
+        return SendResult.SENT
+
+
+@dataclass
+class Recorders:
+    sent: list[tuple[str, uuid.UUID, Notification]] = field(default_factory=list)
+
+    def as_map(self) -> dict[str, Any]:
+        return {c: RecordingNotifier(c, self.sent) for c in ("sse", "webpush", "telegram")}

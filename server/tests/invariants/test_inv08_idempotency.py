@@ -9,7 +9,6 @@ import pytest
 
 from khugjil.crypto import Crypto
 from tests.fixtures.emails import FakeTxn, Mailer
-from tests.invariants.helpers import pending
 
 pytestmark = pytest.mark.invariant(8)
 
@@ -51,7 +50,6 @@ async def test_concurrent_duplicates_store_once(world, mailer: Mailer) -> None: 
     assert await world.count("transaction") == 1
 
 
-@pending("delivery")
 @pytest.mark.db
 async def test_fanout_twice_delivers_once_per_target(world, mailer: Mailer) -> None:  # type: ignore[no-untyped-def]
     outcome = await world.ingest(mailer.bank_mail(FakeTxn(journal="7654321")))
