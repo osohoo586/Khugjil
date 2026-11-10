@@ -34,6 +34,8 @@ class Purpose(enum.IntEnum):
     IDEMPOTENCY = 4
     INBOUND_HMAC = 5
     CHAT_HMAC = 6
+    CSRF = 7
+    SHORT_CODE = 8
 
 
 class DecryptError(Exception):

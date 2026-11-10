@@ -312,7 +312,19 @@ class World:
             return sub.id
 
     async def api_transactions_json(self) -> str:
-        raise NotImplementedError  # implemented with the cashier API
+        """Everything the cashier API returns about recent transactions, as text."""
+        from tests.fixtures.api import ApiHarness
+
+        api = await ApiHarness.create(self, self.db.dnsfunc)
+        try:
+            await api.ready()
+            listing = await api.client.get("/api/v1/transactions")
+            verify = await api.client.get("/api/v1/verify", params={"amount": "2800"})
+            info = await api.client.get("/api/v1/device")
+            assert verify.json()["matches"], verify.text
+            return "\n".join([listing.text, verify.text, info.text])
+        finally:
+            await api.close()
 
 
 class RecordingNotifier:

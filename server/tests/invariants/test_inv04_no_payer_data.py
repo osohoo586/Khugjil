@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 
 from tests.fixtures.emails import PAYER_ACCOUNT, TENANT_ACCOUNT, Mailer
-from tests.invariants.helpers import evaluate, pending
+from tests.invariants.helpers import evaluate
 
 pytestmark = pytest.mark.invariant(4)
 
@@ -27,7 +27,6 @@ def test_accepted_result_has_no_payer_fields(mailer: Mailer) -> None:
         assert marker not in text
 
 
-@pending("pipeline + delivery")
 @pytest.mark.db
 async def test_nothing_downstream_contains_payer_data(world, mailer: Mailer, log_capture) -> None:  # type: ignore[no-untyped-def]
     outcome = await world.ingest(mailer.bank_mail())
