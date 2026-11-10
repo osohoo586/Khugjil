@@ -115,6 +115,18 @@ def _worker() -> int:
     return 0
 
 
+async def _telegram_webhook() -> int:
+    from khugjil.api_v1.telegram_hook import set_webhook
+    from khugjil.runtime import Runtime
+    from khugjil.settings import Settings
+
+    rt = await Runtime.create(Settings())
+    try:
+        return await set_webhook(rt)
+    finally:
+        await rt.close()
+
+
 async def _tenant_create(name: str) -> int:
     from khugjil.runtime import Runtime
     from khugjil.services.provisioning import create_tenant
@@ -126,6 +138,9 @@ async def _tenant_create(name: str) -> int:
         tenant_id, local = await create_tenant(rt.sm, rt.crypto, name)
         print(f"tenant_id={tenant_id}")
         print(f"inbound_address={local}@{settings.inbound_domain}")
+        from khugjil.services.invites import create_owner_invite
+
+        print(f"owner_invite={await create_owner_invite(rt, tenant_id)}")
     finally:
         await rt.close()
     return 0
@@ -139,6 +154,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("migrate", help="apply database migrations (owner role)")
     sub.add_parser("smtp", help="run the inbound SMTP server")
     sub.add_parser("worker", help="run the background worker")
+    tg = sub.add_parser("telegram", help="Telegram bot")
+    tg.add_argument("action", choices=["set-webhook"])
     tenant = sub.add_parser("tenant", help="tenant administration")
     tenant.add_argument("action", choices=["create"])
     tenant.add_argument("--name", required=True)
@@ -154,6 +171,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.cmd == "worker":
         return _worker()
+    if args.cmd == "telegram":
+        return asyncio.run(_telegram_webhook())
     return asyncio.run(_tenant_create(args.name))
 
 

@@ -22,7 +22,7 @@ CASHIER_API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
 
 def build_cashier_app(holder: RuntimeHolder) -> ASGIApp:
-    from khugjil.api_v1 import cashier, hooks, stream  # noqa: F401 - stream registers routes
+    from khugjil.api_v1 import cashier, hooks, stream, telegram_hook  # noqa: F401 - stream registers routes
 
     app = FastAPI(
         title="Khugjil cashier API",
@@ -34,6 +34,7 @@ def build_cashier_app(holder: RuntimeHolder) -> ASGIApp:
     app.state.holder = holder
     app.include_router(cashier.router)
     app.include_router(hooks.router)
+    app.include_router(telegram_hook.router)
 
     @app.exception_handler(HTTPException)
     async def http_error(_: Request, exc: HTTPException) -> JSONResponse:
