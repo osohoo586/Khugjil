@@ -4,7 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-The repository holds only `SPEC.md`, the authoritative spec for a multi-tenant **Khan Bank income notifier**. There is no code, build setup or git history yet. Read `SPEC.md` in full before doing anything. This file summarizes the parts that are easiest to get wrong; when they disagree, `SPEC.md` wins.
+`SPEC.md` is the authoritative spec for a multi-tenant **Khan Bank income notifier**; `PLAN.md` is the approved design (architecture, data model, threat model, open questions Q1–Q36). Phase 1 is being implemented on the `phase1` branch. This file summarizes the parts that are easiest to get wrong; when they disagree, `SPEC.md` wins.
+
+## Commands
+
+Run from the repo root unless noted. Tests need the throwaway Postgres/Redis containers.
+
+```sh
+make services                  # start test Postgres (127.0.0.1:55432) + Redis (:56379)
+make lint typecheck security   # ruff + format check, mypy --strict, bandit + pip-audit
+make test                      # full pytest suite
+make coverage                  # tests + per-package ≥95% gate (scripts/coverage_gate.py)
+cd server && uv run pytest tests/unit/test_foundation.py::test_tokens   # single test
+cd server && uv run pytest -m "invariant"                                # SPEC §3 invariant tests only
+```
+
+- Python deps are managed with `uv` (`server/uv.lock`); never pip-install into the project.
+- pytest runs with sockets disabled except localhost (pytest-socket); DKIM DNS goes through a stub in tests.
+- Invariant tests live in `server/tests/invariants/` and are `xfail(strict=True)` until the feature that enforces them lands; remove the marker in the same commit as the feature.
+- Writing `.env*` files is blocked by the user's permission settings, and a hook blocks Bash commands that mention `.env`. Configuration variables are documented in `docs/configuration.md`; the user creates the env file themselves.
 
 ## Required workflow (SPEC §12)
 

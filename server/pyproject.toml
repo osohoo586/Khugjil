@@ -1,0 +1,97 @@
+[project]
+name = "khugjil"
+version = "0.1.0"
+description = "Khan Bank income notifier (multi-tenant, security-first)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiosmtpd>=1.4.6",
+    "alembic>=1.13",
+    "argon2-cffi>=23.1",
+    "arq>=0.26",
+    "authres>=1.2",
+    "dkimpy>=1.1.6",
+    "dnspython>=2.6",
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "jinja2>=3.1",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.4",
+    "pynacl>=1.5",
+    "pyotp>=2.9",
+    "python-multipart>=0.0.9",
+    "pywebpush>=2.0",
+    "redis>=5.0",
+    "segno>=1.6",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "structlog>=24.1",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.scripts]
+khugjil = "khugjil.cli:main"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.7",
+    "coverage[toml]>=7.5",
+    "cryptography>=43",
+    "hypothesis>=6.100",
+    "mypy>=1.11",
+    "pip-audit>=2.7",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.24",
+    "pytest-socket>=0.7",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/khugjil"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC", "PT", "N", "C4", "PIE", "RET"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # Cyrillic text is intentional
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S311"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["dkim.*", "dkim", "aiosmtpd.*", "pywebpush.*", "segno.*", "authres.*", "arq.*", "py_vapid.*", "dns.*"]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+addopts = "-ra --strict-markers --disable-socket --allow-hosts=127.0.0.1,::1,localhost"
+xfail_strict = true
+markers = [
+    "invariant(n): SPEC §3 hard security invariant number n",
+    "db: needs the PostgreSQL/Redis test services",
+]
+
+[tool.coverage.run]
+source = ["khugjil"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

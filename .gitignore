@@ -1,0 +1,28 @@
+# Secrets: the operator creates this file; it must never be committed.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
+
+# Node / frontend
+node_modules/
+cashier/dist/
+e2e/test-results/
+e2e/playwright-report/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
