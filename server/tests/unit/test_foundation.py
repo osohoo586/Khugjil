@@ -144,3 +144,22 @@ def test_stdlib_messages_are_dropped() -> None:
     out = buf.getvalue()
     assert "secret@in.example" not in out
     assert "stdlib_log" in out
+
+
+def test_cli_keys_generate(capsys: pytest.CaptureFixture[str]) -> None:
+    import base64 as b64
+
+    from khugjil.cli import main
+
+    assert main(["keys", "generate"]) == 0
+    out = dict(line.split("=", 1) for line in capsys.readouterr().out.splitlines() if "=" in line)
+    assert len(b64.b64decode(out["KHJ_MASTER_KEY"])) == 32
+    assert len(out["KHJ_VAPID_PUBLIC_KEY"]) > 80
+    make_settings(master_key=out["KHJ_MASTER_KEY"])
+
+
+def test_cli_migrate_requires_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    from khugjil.cli import main
+
+    monkeypatch.delenv("KHJ_MIGRATION_DATABASE_URL", raising=False)
+    assert main(["migrate"]) == 2

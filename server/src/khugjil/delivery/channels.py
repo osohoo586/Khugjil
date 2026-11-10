@@ -126,6 +126,9 @@ class TelegramNotifier:
         self._client = client
 
     async def send(self, target: SendTarget, note: Notification) -> SendResult:
+        return await self.send_text(target, note.plain_text())
+
+    async def send_text(self, target: SendTarget, text: str) -> SendResult:
         if not self._token:
             return SendResult.GONE
         async with tenant_session(self._sm, target.tenant_id) as s:
@@ -146,7 +149,7 @@ class TelegramNotifier:
         try:
             resp = await self._client.post(
                 f"{TELEGRAM_API}/bot{self._token}/sendMessage",
-                json=send_message_payload(chat_id=chat_id, text=note.plain_text()),
+                json=send_message_payload(chat_id=chat_id, text=text),
                 timeout=10,
             )
         except httpx.HTTPError:
