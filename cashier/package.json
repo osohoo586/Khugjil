@@ -1,0 +1,26 @@
+{
+  "name": "khugjil-cashier",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "sync-shared": "node scripts/sync-shared.mjs",
+    "dev": "npm run sync-shared && vite",
+    "build": "npm run sync-shared && npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sw.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "jsdom": "31.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2",
+    "vite": "8.3.7",
+    "vitest": "5.1.0"
+  },
+  "overrides": {
+    "minimatch": "11.0.5"
+  }
+}

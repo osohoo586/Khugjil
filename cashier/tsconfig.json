@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": [
+      "vitest/globals",
+      "vite/client"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "vite.config.ts"
+  ],
+  "exclude": [
+    "src/sw.ts"
+  ]
+}
