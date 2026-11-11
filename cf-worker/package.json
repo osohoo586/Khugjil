@@ -1,0 +1,10 @@
+{
+  "name": "khugjil-cf-worker",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Email Worker for the port-25 fallback (PLAN Q4). Optional.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "deploy": "npx wrangler@4.154.0 deploy"
+  }
+}

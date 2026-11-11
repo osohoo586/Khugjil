@@ -375,3 +375,16 @@ async def test_agent_pairing_from_a_browser_page_is_refused(world: Any, mailer: 
         assert r.status_code == 200
     finally:
         await h.close()
+
+
+def test_cf_signature_matches_the_worker_vectors() -> None:
+    """The Cloudflare Worker (cf-worker/) signs with the same vectors; see its tests."""
+    import json
+    from pathlib import Path
+
+    vectors = json.loads(
+        (Path(__file__).resolve().parents[3] / "shared" / "cf_hook_vectors.json").read_text()
+    )
+    for v in vectors:
+        body = v["body"].encode()
+        assert cf_signature(v["secret"], v["ts"], v["rcpt"], body) == v["signature"]

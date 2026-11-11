@@ -1,4 +1,4 @@
-.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets agent-check
+.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets agent-check cf-worker-test
 
 COMPOSE_TEST = docker compose -f deploy/docker-compose.test.yml
 
@@ -38,5 +38,8 @@ sync-assets:          ## copy shared design tokens + fonts into the admin static
 	mkdir -p server/src/khugjil/admin/static/shared/fonts
 	cp shared/tokens.css server/src/khugjil/admin/static/shared/
 	cp shared/fonts/* server/src/khugjil/admin/static/shared/fonts/
+
+cf-worker-test:       ## Cloudflare Email Worker (port-25 fallback) tests, Node only
+	cd cf-worker && npm test
 
 check: lint typecheck security coverage

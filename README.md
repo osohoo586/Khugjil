@@ -60,7 +60,8 @@ Set every record to **DNS only** (grey cloud), not Proxied:
 - Proxying would also let a third party terminate TLS for the admin panel and the cashier API.
 
 Inbound TCP port 25 must be reachable (PLAN Q4). If your provider blocks it, use the Cloudflare
-Email Routing fallback (`/hooks/cf`, signed requests; set `KHJ_CF_INGEST_SECRET`).
+Email Routing fallback: [`cf-worker/README.md`](cf-worker/README.md) (`/hooks/cf`, signed requests;
+set `KHJ_CF_INGEST_SECRET`).
 
 ### 2. Server
 

@@ -1,0 +1,14 @@
+# Deploy only if inbound port 25 is unusable on the server (PLAN Q4). See README.md here.
+name = "khugjil-email"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[vars]
+KHJ_HOOK_URL = "https://app.khugjil.usukh.shop/hooks/cf"
+
+# The shared secret is set with `npx wrangler@4.154.0 secret put KHJ_CF_INGEST_SECRET` and must equal
+# the server's KHJ_CF_INGEST_SECRET. It is never written to this file.
+
+[observability]
+enabled = false

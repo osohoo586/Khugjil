@@ -42,6 +42,7 @@ jobs:
           node-version: "22"
       - run: cd cashier && npm ci
       - run: make cashier-check
+      - run: cd cf-worker && npm test
 
   agent:
     # Phase 2 desktop agent (PLAN-PHASE2 §7). Built and tested on Windows; the installer is unsigned

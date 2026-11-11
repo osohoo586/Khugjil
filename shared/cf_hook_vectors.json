@@ -1,0 +1,10 @@
+[
+  {
+    "secret": "test-cf-secret-not-real",
+    "ts": "1794370000",
+    "rcpt": "k7q2m4x9d3ta6vwe5hb2nrfy@in.khugjil.test",
+    "body": "From: notify@bank.example\r\nTo: k7q2m4x9d3ta6vwe5hb2nrfy@in.khugjil.test\r\nSubject: Test income notification\r\n\r\nfake body\r\n",
+    "body_sha256": "0222d0cbf82c28f73daa28304ffa4938ce069ad7c40dd9d4d7b27e90bd08f5fb",
+    "signature": "b62d806f76d6350d5b3c9c711409044898b0bc5dee5a21f2969c94822b19db2a"
+  }
+]
