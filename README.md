@@ -27,6 +27,8 @@ make cashier-check            # eslint, tsc, vitest, npm audit (cashier PWA)
 make e2e                      # Playwright screenshot tests (see e2e/README.md)
 make agent-check              # desktop agent: capability guard, rustfmt, clippy, Rust tests
 ./scripts/dev-up.sh           # run it locally: https://admin.khugjil.localhost:8443 (Caddy local CA)
+./scripts/dev-seed.sh         # demo data: 2 accounts, 2 cashiers (PIN 482913), today's history
+./scripts/dev-seed.sh txn 15000 "Захиалга"   # one new transaction now (shows up live on the cashier)
 ./scripts/dev-down.sh         # stop it (--wipe also deletes the dev database)
 ```
 

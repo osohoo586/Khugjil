@@ -4,28 +4,16 @@
 #   - migrations, then the API (uvicorn 127.0.0.1:8000) and the worker, in the background
 #   - Caddy with a local CA: https://admin.khugjil.localhost:8443 and https://app.khugjil.localhost:8443
 #   - on first run, a demo tenant; its owner invite link is printed
-# Every value below is a throwaway development value, not a secret. Logs and PIDs go to .dev/.
+# Settings come from scripts/dev-config.sh (throwaway values). Logs and PIDs go to .dev/.
 # Stop with scripts/dev-down.sh.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$ROOT/.dev"
 mkdir -p "$STATE"
-PG_PW="dev-only-not-secret"
-
-export KHJ_ENV=development
-export KHJ_DOMAIN=khugjil.localhost
-export KHJ_PUBLIC_PORT=8443
-export KHJ_DEV_ROUTES=true
-export KHJ_AGENT_DEVICES_ENABLED=true
-export KHJ_MASTER_KEY="ZGV2LW9ubHktbm90LXNlY3JldC1rZXktMzJieXRlcyE="   # "dev-only-not-secret-key-32bytes!"
-export KHJ_DATABASE_URL="postgresql+psycopg://khugjil_app:${PG_PW}@127.0.0.1:55452/khugjil"
-export KHJ_MIGRATION_DATABASE_URL="postgresql+psycopg://postgres:${PG_PW}@127.0.0.1:55452/khugjil"
-export KHJ_REDIS_URL="redis://127.0.0.1:56399/0"
-# Fake bank values (the real ones are PLAN Q1-Q3 and are never guessed).
-export KHJ_BANK_SENDERS='["notify@bank.example"]'
-export KHJ_BANK_DKIM_DOMAINS='["bank.example"]'
-export KHJ_BANK_SUBJECT_RE='^Test income notification$'
+# shellcheck source=dev-config.sh
+. "$ROOT/scripts/dev-config.sh"
+PG_PW="$DEV_PG_PW"
 
 container() {  # name, image, port mapping, extra args...
   local name=$1 image=$2 ports=$3; shift 3
@@ -92,5 +80,6 @@ Up.
     $(grep '^owner_invite=' "$STATE/tenant.txt" | cut -d= -f2-)
 
 The certificate comes from Caddy's local CA, so the browser warns once per host (Advanced -> Proceed).
+Demo data (accounts, cashiers, transactions): scripts/dev-seed.sh
 Logs: $STATE/*.log   Stop: scripts/dev-down.sh
 EOF
