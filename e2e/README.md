@@ -26,3 +26,14 @@ npm run update  # regenerate baselines after an intended UI change, then review 
   ```
   Review the PNGs before committing. When upgrading Playwright, change the image tag in both
   places (here and `.github/workflows/ci.yml`).
+
+## Browser flows (`flows/`)
+
+`npm run flows` (or `make e2e-flows`) drives a real browser through the full local stack started
+by `scripts/dev-up.sh`: the owner invite with TOTP enrolment, sign-in, pairing a cashier PC with a
+code from the admin panel, a PIN shift, a live payment arriving over SSE through Caddy, and
+revoking the PC. Each run creates its own shop (`scripts/dev-seed.sh tenant …`), so the demo shop
+is left alone. Any 403 or 5xx response fails the run: these tests exist because a referrer-policy
+bug once made every admin form fail in real browsers while in-process tests passed. CI runs them
+in the `flows` job.
+

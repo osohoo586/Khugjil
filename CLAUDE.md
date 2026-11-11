@@ -17,6 +17,8 @@ make test                      # full pytest suite
 make coverage                  # tests + per-package ≥95% gate (scripts/coverage_gate.py)
 make cashier-check             # cashier: eslint, tsc (app + service worker), vitest, npm audit
 make e2e                       # Playwright screenshots (builds cashier, renders admin fixtures)
+scripts/dev-up.sh              # local stack on https://{admin,app}.khugjil.localhost:8443; dev-seed.sh for demo data
+make e2e-flows                 # real-browser flows against that running stack (invite, TOTP, pairing, SSE)
 make sync-assets               # after editing shared/tokens.css or shared/fonts
 make agent-check               # desktop agent: capability guard, rustfmt, clippy, cargo test (Rust on PATH)
 cd server && uv run pytest tests/unit/test_foundation.py::test_tokens   # single test

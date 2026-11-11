@@ -1,4 +1,4 @@
-.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets agent-check cf-worker-test
+.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets agent-check cf-worker-test e2e-flows
 
 COMPOSE_TEST = docker compose -f deploy/docker-compose.test.yml
 
@@ -28,6 +28,9 @@ cashier-check:
 
 e2e:
 	cd e2e && npm test
+
+e2e-flows:            ## real-browser flows against the running local stack (scripts/dev-up.sh first)
+	cd e2e && npm run flows
 
 agent-check:          ## desktop agent: capability guard, rustfmt, clippy, Rust tests (Phase 2)
 	node agent/scripts/check-capabilities.mjs

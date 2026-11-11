@@ -7,11 +7,15 @@ looks exactly like real traffic.
 
     python -m tests.fixtures.dev_seed                       # accounts, groups, cashiers, history
     python -m tests.fixtures.dev_seed txn [AMOUNT] [TEXT]   # one new transaction now
+    python -m tests.fixtures.dev_seed tenant NAME           # a new shop (browser flow tests)
+
+The shop is read from (and `tenant` writes to) KHJ_DEV_TENANT_FILE, default .dev/tenant.txt.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import time
 import uuid
@@ -35,11 +39,12 @@ from khugjil.db.models import (
 from khugjil.db.tenancy import tenant_session
 from khugjil.ingest.pipeline import ingest
 from khugjil.runtime import Runtime
-from khugjil.services.provisioning import add_bank_account
+from khugjil.services.invites import create_owner_invite
+from khugjil.services.provisioning import add_bank_account, create_tenant
 from khugjil.settings import BANK_TZ, Settings
 from tests.fixtures.emails import TENANT_ACCOUNT, TENANT_ACCOUNT_2, FakeTxn, Mailer
 
-STATE = Path(__file__).resolve().parents[3] / ".dev" / "tenant.txt"
+DEFAULT_STATE = Path(__file__).resolve().parents[3] / ".dev" / "tenant.txt"
 DEMO_PIN = "482913"
 MAIN, BRANCH = "Төв дэлгүүр", "Салбар-2"
 ACCOUNTS = {MAIN: TENANT_ACCOUNT, BRANCH: TENANT_ACCOUNT_2}
@@ -78,8 +83,13 @@ class Tenant:
     inbound_address: str
 
 
+def tenant_file() -> Path:
+    return Path(os.environ.get("KHJ_DEV_TENANT_FILE") or DEFAULT_STATE)
+
+
 def load_tenant() -> Tenant:
-    values = dict(line.split("=", 1) for line in STATE.read_text().splitlines() if "=" in line)
+    text = tenant_file().read_text()
+    values = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
     return Tenant(uuid.UUID(values["tenant_id"]), values["inbound_address"])
 
 
@@ -183,18 +193,40 @@ async def one(amount: str, text: str) -> None:
         await rt.close()
 
 
+async def new_tenant(name: str) -> None:
+    path = tenant_file()
+    if path == DEFAULT_STATE:
+        raise SystemExit("set KHJ_DEV_TENANT_FILE; the demo shop's file is kept as it is")
+    rt = await _runtime()
+    try:
+        tenant_id, local = await create_tenant(rt.sm, rt.crypto, name)
+        invite = await create_owner_invite(rt, tenant_id)
+        path.write_text(
+            f"tenant_id={tenant_id}\ninbound_address={local}@{rt.settings.inbound_domain}\n"
+            f"owner_invite={invite}\n"
+        )
+    finally:
+        await rt.close()
+
+
 async def _start() -> tuple[Runtime, Tenant, Mailer]:
+    return await _runtime(), load_tenant(), Mailer()
+
+
+async def _runtime() -> Runtime:
     from khugjil.logs import configure_logging
 
     configure_logging("WARNING")  # the per-email ingest lines are noise here
     settings = Settings()
     if settings.env != "development" or not settings.domain.endswith(".localhost"):
         raise SystemExit("dev_seed runs only against the local development stack")
-    return await Runtime.create(settings), load_tenant(), Mailer()
+    return await Runtime.create(settings)
 
 
 def main(argv: list[str]) -> None:
-    if argv[:1] == ["txn"]:
+    if argv[:1] == ["tenant"] and len(argv) == 2:
+        asyncio.run(new_tenant(argv[1]))
+    elif argv[:1] == ["txn"]:
         amount = argv[1] if len(argv) > 1 else "12500"
         text = argv[2] if len(argv) > 2 else "Худалдан авалт"
         asyncio.run(one(amount, text))

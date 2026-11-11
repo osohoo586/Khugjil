@@ -31,7 +31,7 @@ app.{$KHJ_DOMAIN} {
 
 	@backend path /api/* /hooks/*
 	handle @backend {
-		reverse_proxy host.docker.internal:8000 {
+		reverse_proxy {$KHJ_DEV_UPSTREAM:host.docker.internal:8000} {
 			flush_interval -1
 		}
 	}
@@ -48,5 +48,5 @@ app.{$KHJ_DOMAIN} {
 admin.{$KHJ_DOMAIN} {
 	import security
 	encode zstd gzip
-	reverse_proxy host.docker.internal:8000
+	reverse_proxy {$KHJ_DEV_UPSTREAM:host.docker.internal:8000}
 }

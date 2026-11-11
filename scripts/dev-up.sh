@@ -51,12 +51,23 @@ start api uv run uvicorn khugjil.web.app:production_app --factory --host 127.0.0
 start worker uv run khugjil worker
 
 echo "· caddy (local CA)"
-container khugjil-dev-caddy caddy:2-alpine 127.0.0.1:8443:8443 \
-  -e KHJ_DOMAIN="$KHJ_DOMAIN" \
-  -v "$ROOT/deploy/Caddyfile.dev:/etc/caddy/Caddyfile:ro" \
-  -v "$ROOT/cashier/dist:/srv/cashier:ro" \
-  -v khugjil-dev-caddy-data:/data \
-  --add-host host.docker.internal:host-gateway
+caddy_args=(-e KHJ_DOMAIN="$KHJ_DOMAIN"
+  -v "$ROOT/deploy/Caddyfile.dev:/etc/caddy/Caddyfile:ro"
+  -v "$ROOT/cashier/dist:/srv/cashier:ro"
+  -v khugjil-dev-caddy-data:/data)
+if [ "$(uname -s)" = Linux ]; then
+  # Linux (CI): share the host network so Caddy reaches the API on 127.0.0.1 and listens on :8443.
+  if [ -z "$(docker ps -aq -f name=^khugjil-dev-caddy$)" ]; then
+    docker run -d --name khugjil-dev-caddy --network host -e KHJ_DEV_UPSTREAM=127.0.0.1:8000 \
+      "${caddy_args[@]}" caddy:2-alpine >/dev/null
+  else
+    docker start khugjil-dev-caddy >/dev/null
+  fi
+else
+  # Docker Desktop (macOS/Windows) forwards host.docker.internal to the host's loopback.
+  container khugjil-dev-caddy caddy:2-alpine 127.0.0.1:8443:8443 "${caddy_args[@]}" \
+    --add-host host.docker.internal:host-gateway
+fi
 
 for _ in $(seq 1 30); do
   code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve admin.khugjil.localhost:8443:127.0.0.1 \
