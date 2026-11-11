@@ -32,8 +32,10 @@ code { font-size: var(--fs-sm); }
 .title-row h1 { margin: 0 0 var(--sp-3); }
 
 /* Public pages (sign-in, invites) */
-body.public { background: var(--bg-subtle); }
-.public-card { max-width: 480px; margin: var(--sp-5) auto; background: var(--surface); border: var(--border-w) solid var(--border); border-radius: var(--radius); padding: var(--sp-4); }
+/* Sign-in, invite and consent pages: the grey fills the whole viewport. Padding (not the card's
+   margin, which would collapse through the body) keeps the gap above the card. */
+body.public { background: var(--bg-subtle); min-height: 100vh; min-height: 100dvh; box-sizing: border-box; padding: var(--sp-5) var(--sp-2); }
+.public-card { max-width: 480px; margin: 0 auto; background: var(--surface); border: var(--border-w) solid var(--border); border-radius: var(--radius); padding: var(--sp-4); }
 .brand { font-weight: var(--fw-semibold); color: var(--accent); margin-bottom: var(--sp-2); }
 
 /* Cards */
