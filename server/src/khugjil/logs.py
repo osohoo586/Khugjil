@@ -45,6 +45,10 @@ ALLOWED_KEYS: frozenset[str] = frozenset(
         "exc_type",
         "exc_frames",
         "transport",
+        # Shape of an unrecognised Gmail forwarding confirmation: MIME types and digit-run
+        # lengths only (never text), to adapt the recogniser (ingest/forwarding.py).
+        "fwd_shape",
+        "fwd_digits",
     }
 )
 _EVENT_RE = re.compile(r"^[a-z][a-z0-9_.]{0,63}$")

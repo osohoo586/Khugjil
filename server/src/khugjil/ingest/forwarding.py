@@ -11,12 +11,13 @@ can see on the email page that the confirmation arrived but was not recognised.
 from __future__ import annotations
 
 import re
-from email.message import EmailMessage
+from email.message import EmailMessage, Message
 from email.utils import getaddresses
 
 from khugjil.ingest.dkim_arc import DnsFunc, dkim_pass
 from khugjil.ingest.reasons import Reason
 from khugjil.ingest.sanitize import clean_text
+from khugjil.logs import get_logger
 
 FORWARDING_SENDER = "forwarding-noreply@google.com"
 _SUBJECT_CODE = re.compile(r"\(#(?P<code>\d{6,12})\)")
@@ -62,7 +63,30 @@ def confirmation_code(msg: EmailMessage, raw: bytes, dnsfunc: DnsFunc) -> str | 
         return Reason.FWD_CONFIRM_UNRECOGNIZED
     if not dkim_pass(raw, ("google.com",), dnsfunc):
         return Reason.FWD_CONFIRM_AUTH_FAIL
-    m = _SUBJECT_CODE.search(clean_text(str(msg["Subject"])))
+    subject = clean_text(str(msg["Subject"]))
+    body = _body_text(msg)
+    m = _SUBJECT_CODE.search(subject) or _BODY_CODE.search(body)
     if m is None:
-        m = _BODY_CODE.search(_body_text(msg))
-    return m.group("code") if m else Reason.FWD_CONFIRM_UNRECOGNIZED
+        get_logger().info(
+            "ingest.fwd_confirm_shape", fwd_shape=shape(msg), fwd_digits=digit_runs(subject, body)
+        )
+        return Reason.FWD_CONFIRM_UNRECOGNIZED
+    return m.group("code")
+
+
+def shape(msg: Message) -> str:
+    """MIME structure only, e.g. ``multipart/alternative[text/plain,text/html]``."""
+    if not msg.is_multipart():
+        return msg.get_content_type()
+    parts = msg.get_payload()
+    if not isinstance(parts, list):
+        return f"{msg.get_content_type()}[?]"
+    inner = ",".join(shape(p) if isinstance(p, Message) else "?" for p in parts[:10])
+    return f"{msg.get_content_type()}[{inner}]"
+
+
+def digit_runs(subject: str, body: str) -> str:
+    """Lengths of digit runs, e.g. ``subject:9 hash:1 body:9,4`` (no digits themselves)."""
+    s_runs = ",".join(str(len(r)) for r in re.findall(r"\d+", subject)[:10]) or "-"
+    b_runs = ",".join(str(len(r)) for r in re.findall(r"\d+", body)[:20]) or "-"
+    return f"subject:{s_runs} hash:{int('#' in subject)} body:{b_runs} chars:{len(body)}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import html
+import io
 from decimal import Decimal
 from email.message import EmailMessage
 from email.policy import SMTP
@@ -354,3 +355,32 @@ def test_first_html_part_wins() -> None:
     assert isinstance(bodies, mime.Bodies)
     assert bodies.html is not None
     assert "first" in bodies.html
+
+
+def test_unrecognised_gmail_confirmation_logs_only_its_shape(
+    mailer: Mailer, log_capture: io.StringIO
+) -> None:
+    """The diagnostic line carries MIME types and digit-run lengths, never text or digits."""
+    from email.message import EmailMessage
+    from email.policy import SMTP
+
+    msg = EmailMessage()
+    msg["From"] = "Gmail Team <forwarding-noreply@google.com>"
+    msg["To"] = "fake@in.khugjil.test"
+    msg["Subject"] = "Gmail notice for MARKER-SUBJECT"
+    msg["Date"] = "Thu, 15 Oct 2026 08:40:00 +0800"
+    msg["Message-ID"] = "<fwd-4@google.com>"
+    msg.set_content("MARKER-BODY 2026 12345\r\n")
+    msg.add_alternative("<p>MARKER-HTML</p>", subtype="html")
+    r = evaluate(_google_signed(mailer, msg.as_bytes(policy=SMTP)), mailer)
+    assert isinstance(r, Dropped)
+    import json
+
+    out = log_capture.getvalue()
+    assert "MARKER" not in out
+    lines = [json.loads(x) for x in out.splitlines() if "fwd_confirm_shape" in x]
+    assert len(lines) == 1
+    line = lines[0]
+    assert line["fwd_shape"] == "multipart/alternative[text/plain,text/html]"
+    assert line["fwd_digits"].startswith("subject:- hash:0 body:4,5 ")
+    assert "12345" not in json.dumps(line)
