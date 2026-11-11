@@ -313,3 +313,65 @@ async def test_sse_route_limits_streams(api: ApiHarness, world: Any) -> None:
 def test_harness_constants() -> None:
     assert APP.startswith("https://app.")
     assert isinstance(httpx.AsyncClient, type)
+
+
+# ---------------------------------------------------------------- Phase 2 agent
+
+
+async def test_agent_token_rotation_keeps_old_token_for_a_grace_period(
+    world: Any, mailer: Mailer
+) -> None:
+    h = await ApiHarness.create(world, mailer.dns, agent_devices=True)
+    try:
+        old = await h.pair_agent()
+        async with tenant_session(world.db.sm, world.tenant_id) as s:
+            await s.execute(
+                update(DeviceCredential).values(created_at=datetime.now(UTC) - timedelta(days=31))
+            )
+        async with h.agent_client(old) as c:
+            r = await c.get("/api/v1/device")
+        assert r.status_code == 200
+        new = r.headers["x-khj-device-token"]
+        assert new != old
+        async with h.agent_client(old) as c:  # still valid, and does not rotate again
+            r = await c.get("/api/v1/device")
+        assert r.status_code == 200
+        assert "x-khj-device-token" not in r.headers
+        async with h.agent_client(new) as c:
+            assert (await c.get("/api/v1/device")).status_code == 200
+        async with tenant_session(world.db.sm, world.tenant_id) as s:
+            await s.execute(
+                text(
+                    "UPDATE device_credential SET expires_at = now() - interval '1 second' "
+                    "WHERE expires_at < now() + interval '10 minutes'"
+                )
+            )
+        async with h.agent_client(old) as c:
+            assert (await c.get("/api/v1/device")).status_code == 401
+        async with h.agent_client(new, version="0.3.1") as c:
+            assert (await c.get("/api/v1/device")).status_code == 200
+        device = next(d for d in await world.app_rows("device") if d["name"] == "Касс-API")
+        assert device["agent_version"] == "0.3.1"
+    finally:
+        await h.close()
+
+
+async def test_agent_pairing_from_a_browser_page_is_refused(world: Any, mailer: Mailer) -> None:
+    h = await ApiHarness.create(world, mailer.dns, agent_devices=True)
+    try:
+        pairing = await h.new_pairing(kind="agent")
+        r = await h.client.post(  # same-origin browser request asking for an agent token
+            "/api/v1/pair",
+            json={"token": pairing.token, "client": "agent"},
+            headers={"x-khj-agent": "0.1.0"},
+        )
+        assert r.status_code == 400
+        assert "device_token" not in r.text
+        async with h.agent_client(version="0.0.1") as c:
+            r = await c.post("/api/v1/pair", json={"token": pairing.token, "client": "agent"})
+        assert r.status_code == 426
+        async with h.agent_client() as c:  # the code was not used up by either attempt
+            r = await c.post("/api/v1/pair", json={"token": pairing.token, "client": "agent"})
+        assert r.status_code == 200
+    finally:
+        await h.close()

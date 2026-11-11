@@ -10,7 +10,7 @@
   {% for d in devices %}
   <tr>
     <td>{{ d.name }}</td>
-    <td>{{ "Веб" if d.kind == "web" else "Агент" }}</td>
+    <td>{% if d.kind == "web" %}Веб{% else %}Агент{% if d.agent_version %} <span class="small muted tabular">{{ d.agent_version }}</span>{% endif %}{% endif %}</td>
     <td>{{ (device_groups.get(d.id) or ["—"]) | join(", ") }}</td>
     <td class="tabular">{{ d.last_seen_at | hm }}</td>
     <td>{% if online[d.id] %}{{ ui.badge("success", "Онлайн") }}{% else %}{{ ui.badge("neutral", "Офлайн") }}{% endif %}
@@ -28,6 +28,12 @@
 <form method="post" action="/devices/pair" class="stack narrow" hx-post="/devices/pair" hx-target="#htmx-dialog" hx-swap="innerHTML">
   {{ ui.csrf() }}
   {{ ui.field("device_name", "Нэр", hint="Жишээ нь Касс-3", required=True, attrs={"maxlength": "60"}) }}
+  {% if agent_enabled %}
+  <fieldset><legend>Төрөл</legend>
+    <label class="check"><input type="radio" name="kind" value="web" checked> Веб — Chrome, Edge эсвэл утас</label>
+    <label class="check"><input type="radio" name="kind" value="agent"> Агент — Windows дээрх касс програм</label>
+  </fieldset>
+  {% endif %}
   <fieldset><legend>Бүлэг</legend>{% for g in groups %}<label class="check"><input type="checkbox" name="group_ids" value="{{ g.id }}"> {{ g.name }}</label>{% else %}<p class="muted">Эхлээд бүлэг үүсгэнэ үү.</p>{% endfor %}</fieldset>
   <button class="btn btn-primary" type="submit">Код үүсгэх</button>
 </form>

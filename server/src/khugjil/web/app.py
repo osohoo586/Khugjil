@@ -48,7 +48,12 @@ def build_cashier_app(holder: RuntimeHolder) -> ASGIApp:
         )
 
     origin = f"https://{holder.settings.app_host}"
-    guarded = OriginGuard(app, origin, exempt_prefixes=("/hooks/",))
+    guarded = OriginGuard(
+        app,
+        origin,
+        exempt_prefixes=("/hooks/",),
+        allow_non_browser=holder.settings.agent_devices_enabled,
+    )
     return SecurityHeaders(guarded, CASHIER_API_CSP, no_store_prefixes=("/api/",))
 
 

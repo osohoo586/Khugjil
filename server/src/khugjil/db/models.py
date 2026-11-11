@@ -332,6 +332,7 @@ class Device(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    agent_version: Mapped[str | None] = mapped_column(Text)
 
 
 class DeviceGroup(Base):
@@ -359,10 +360,15 @@ class DeviceCredential(Base):
 
 class PairingCode(Base):
     __tablename__ = "pairing_code"
-    __table_args__ = (UniqueConstraint("tenant_id", "id"), _tenant_fk())
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id"),
+        _tenant_fk(),
+        CheckConstraint("kind IN ('web','agent')", name="pairing_code_kind"),
+    )
     id: Mapped[uuid.UUID] = _pk()
     tenant_id: Mapped[uuid.UUID] = _tenant()
     device_name: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="web")
     group_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=False)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
     short_code_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)

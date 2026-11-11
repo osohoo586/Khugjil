@@ -2,12 +2,16 @@
 <div class="pair">
   <p class="dialog-title">Төхөөрөмж холбох — {{ device_name }}</p>
   <div class="pair-body">
-    {{ ui.qr(url, "Төхөөрөмж холбох QR код") }}
+    {% if url %}{{ ui.qr(url, "Төхөөрөмж холбох QR код") }}{% endif %}
     <div>
       <p>Код: <strong class="code tabular">{{ pairing.short_code }}</strong></p>
       <p class="muted" data-expires="{{ pairing.expires_at.isoformat() }}">10 минутын дотор, нэг удаа ашиглана.</p>
     </div>
   </div>
+  {% if kind == "agent" %}
+  <p>Кассын компьютер дээрх Хугжил касс програмын «Энэ компьютерийг холбох» хэсэгт кодыг оруулна уу.</p>
+  {% else %}
   <p>Кассын компьютер дээр <strong>{{ app_host }}/pair</strong> хаягийг нээж кодыг оруулна уу. Утсаар QR кодыг уншуулна уу.</p>
+  {% endif %}
   <div class="dialog-actions"><a class="btn btn-secondary" href="/devices" data-dialog-close>Хаах</a></div>
 </div>

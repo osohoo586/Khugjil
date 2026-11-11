@@ -36,11 +36,22 @@ def test_master_key_must_be_32_bytes() -> None:
         make_settings(master_key="c2hvcnQ=")
 
 
-def test_production_refuses_dev_routes_and_agents() -> None:
+def test_production_refuses_dev_routes() -> None:
     with pytest.raises(ValidationError):
         make_settings(env="production", dev_routes=True)
-    with pytest.raises(ValidationError):
-        make_settings(env="production", agent_devices_enabled=True)
+
+
+def test_agent_settings() -> None:
+    from khugjil.settings import parse_agent_version
+
+    s = make_settings(env="production", agent_devices_enabled=True, agent_min_version="0.2.10")
+    assert s.agent_devices_enabled
+    assert parse_agent_version(s.agent_min_version) == (0, 2, 10)
+    assert make_settings().agent_devices_enabled is False
+    for bad in ("1.2", "v1.2.3", "01.2.3", "1.2.3-rc1", "1.2.3 ", "99999.0.0"):
+        assert parse_agent_version(bad) is None, bad
+        with pytest.raises(ValidationError):
+            make_settings(agent_min_version=bad)
 
 
 def test_secrets_not_in_repr() -> None:

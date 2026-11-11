@@ -31,6 +31,10 @@ from khugjil.services.shifts import end_open_shifts
 PAIRING_TTL = timedelta(minutes=10)
 CREDENTIAL_TTL = timedelta(days=400)
 CREDENTIAL_ROTATE = timedelta(days=30)
+# After a rotation the old token keeps working this long, so a response lost in transit (or an
+# agent that crashes before saving the new token) does not lock the device out.
+ROTATION_GRACE = timedelta(minutes=5)
+DEVICE_KINDS = frozenset({"web", "agent"})
 SHIFT_ROLES = frozenset({"owner", "admin", "cashier"})
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -78,7 +82,10 @@ async def create_pairing(
     group_ids: list[uuid.UUID],
     created_by: uuid.UUID | None,
     now: datetime,
+    kind: str = "web",
 ) -> NewPairing:
+    if kind not in DEVICE_KINDS:
+        raise PairingError("unknown device kind")
     if not group_ids:
         raise PairingError("at least one group is required")
     found = set(await s.scalars(select(RecipientGroup.id).where(RecipientGroup.id.in_(group_ids))))
@@ -88,6 +95,7 @@ async def create_pairing(
     pairing = PairingCode(
         tenant_id=tenant_id,
         device_name=device_name.strip()[:60] or "Төхөөрөмж",
+        kind=kind,
         group_ids=list(group_ids),
         token_hash=token_hash(token),
         short_code_hash=short_code_hash(crypto, short),
@@ -146,6 +154,9 @@ async def redeem_pairing(
         pairing = await s.get(PairingCode, pairing_id, with_for_update=True)
         if pairing is None or pairing.used_at is not None or pairing.expires_at <= now:
             raise PairingError("expired or used")
+        if pairing.kind != kind:
+            # Same error as a wrong code, and the code stays usable by the right client.
+            raise PairingError("wrong kind")
         pairing.used_at = now
         device = Device(tenant_id=tenant_id, name=pairing.device_name, kind=kind, paired_at=now)
         s.add(device)
@@ -166,9 +177,19 @@ class DeviceAuth:
     tenant_id: uuid.UUID
     device_id: uuid.UUID
     rotated_token: str | None = None
+    kind: str = "web"
 
 
-async def authenticate_device(sm: SessionMaker, token: str, now: datetime) -> DeviceAuth | None:
+async def authenticate_device(
+    sm: SessionMaker,
+    token: str,
+    now: datetime,
+    *,
+    kind: str = "web",
+    agent_version: str | None = None,
+) -> DeviceAuth | None:
+    """Resolve a device token. The token only counts for a device of the expected ``kind``: the
+    web cookie never authenticates an agent, and an agent's bearer token never a web device."""
     h = token_hash(token)
     found = await Resolver(sm).device_token(h)
     if found is None:
@@ -176,18 +197,20 @@ async def authenticate_device(sm: SessionMaker, token: str, now: datetime) -> De
     tenant_id, device_id = found
     rotated = None
     async with tenant_session(sm, tenant_id) as s:
+        device = await s.get(Device, device_id)
+        if device is None or device.kind != kind:
+            return None
         cred = (
             await s.execute(select(DeviceCredential).where(DeviceCredential.token_hash == h))
         ).scalar_one()
-        device = await s.get(Device, device_id)
-        if device is not None and (
-            device.last_seen_at is None or device.last_seen_at < now - timedelta(seconds=60)
-        ):
+        if device.last_seen_at is None or device.last_seen_at < now - timedelta(seconds=60):
             device.last_seen_at = now
-        if cred.created_at < now - CREDENTIAL_ROTATE:
+        if kind == "agent" and agent_version and device.agent_version != agent_version:
+            device.agent_version = agent_version
+        if cred.created_at < now - CREDENTIAL_ROTATE and cred.expires_at > now + ROTATION_GRACE:
             rotated = await _issue_credential(s, tenant_id, device_id, now)
-            await s.delete(cred)
-    return DeviceAuth(tenant_id, device_id, rotated)
+            cred.expires_at = now + ROTATION_GRACE
+    return DeviceAuth(tenant_id, device_id, rotated, kind)
 
 
 async def revoke_device(

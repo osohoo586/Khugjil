@@ -20,6 +20,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 MAX_MESSAGE_BYTES = 256 * 1024
 BANK_TZ = "Asia/Ulaanbaatar"
 
+_AGENT_VERSION = re.compile(r"(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})")
+
+
+def parse_agent_version(value: str | None) -> tuple[int, int, int] | None:
+    """Strict MAJOR.MINOR.PATCH (no pre-release tags, no leading zeros); None if malformed."""
+    match = _AGENT_VERSION.fullmatch(value or "")
+    if match is None:
+        return None
+    major, minor, patch = (int(g) for g in match.groups())
+    return major, minor, patch
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="KHJ_", extra="ignore", frozen=True)
@@ -56,7 +67,9 @@ class Settings(BaseSettings):
     cf_ingest_secret: SecretStr | None = None
 
     dev_routes: bool = False
-    agent_devices_enabled: bool = False  # Phase 2; must stay False until approved.
+    # Phase 2 desktop agent (PLAN-PHASE2.md). Off until the agent ships.
+    agent_devices_enabled: bool = False
+    agent_min_version: str = "0.1.0"
 
     @field_validator("bank_senders", "bank_dkim_domains")
     @classmethod
@@ -72,6 +85,13 @@ class Settings(BaseSettings):
         re.compile(v)
         return v
 
+    @field_validator("agent_min_version")
+    @classmethod
+    def _semver(cls, v: str) -> str:
+        if parse_agent_version(v) is None:
+            raise ValueError("agent_min_version must look like 1.2.3")
+        return v
+
     @field_validator("master_key")
     @classmethod
     def _key_len(cls, v: SecretStr) -> SecretStr:
@@ -85,11 +105,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _production_guards(self) -> Settings:
-        if self.env == "production":
-            if self.dev_routes:
-                raise ValueError("dev_routes must be disabled in production")
-            if self.agent_devices_enabled:
-                raise ValueError("agent devices are Phase 2 and not enabled")
+        if self.env == "production" and self.dev_routes:
+            raise ValueError("dev_routes must be disabled in production")
         return self
 
     @cached_property

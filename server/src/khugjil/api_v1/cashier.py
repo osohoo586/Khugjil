@@ -3,10 +3,11 @@ agent can use it unchanged. Every endpoint is scoped to the authenticated device
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -48,10 +49,14 @@ from khugjil.runtime import Runtime
 from khugjil.services.consent import give_consent
 from khugjil.services.invites import InviteError, consume_invite, inspect_invite
 from khugjil.services.shifts import end_open_shifts
-from khugjil.settings import BANK_TZ
+from khugjil.settings import BANK_TZ, parse_agent_version
 from khugjil.web.base import RuntimeHolder
 
 DEVICE_COOKIE = "__Host-khj_dev"
+# Phase 2 desktop agent (PLAN-PHASE2 §2): bearer token, version header, rotated-token header.
+AGENT_VERSION_HEADER = "x-khj-agent"
+ROTATED_TOKEN_HEADER = "x-khj-device-token"  # noqa: S105  # nosec B105 - header name
+_BEARER = re.compile(r"Bearer ([A-Za-z0-9_-]{32,128})")
 COOKIE_MAX_AGE = 400 * 24 * 3600
 VERIFY_WINDOW = timedelta(minutes=15)
 LIST_LIMIT = 10
@@ -73,6 +78,7 @@ MESSAGES = {
     ),
     "weak_pin": "ПИН код хэт энгийн байна. Өөр 6 оронтой код сонгоно уу.",
     "not_found": "Олдсонгүй.",
+    "update_required": "Касс програмаа шинэчилнэ үү.",
 }
 
 
@@ -108,9 +114,44 @@ def set_device_cookie(response: Response, token: str) -> None:
     )
 
 
+def agent_version(request: Request, rt: Runtime) -> str:
+    """The agent's version header, or 426 when it is missing, malformed or too old."""
+    raw = request.headers.get(AGENT_VERSION_HEADER)
+    version = parse_agent_version(raw)
+    minimum = parse_agent_version(rt.settings.agent_min_version)
+    if raw is None or version is None or minimum is None or version < minimum:
+        raise fail(426, "update_required")
+    return raw
+
+
+async def _agent_auth(request: Request, response: Response, rt: Runtime, header: str) -> DeviceAuth:
+    # A bearer token is only for the agent's Rust core, which sends neither an Origin header nor
+    # cookies. Anything else (a browser replaying a leaked token, a mixed request) is refused.
+    match = _BEARER.fullmatch(header)
+    if (
+        not rt.settings.agent_devices_enabled
+        or match is None
+        or "origin" in request.headers
+        or "cookie" in request.headers
+    ):
+        raise fail(401, "unauthorized")
+    version = agent_version(request, rt)
+    auth = await authenticate_device(
+        rt.sm, match.group(1), utcnow(), kind="agent", agent_version=version
+    )
+    if auth is None:
+        raise fail(401, "unauthorized")
+    if auth.rotated_token:
+        response.headers[ROTATED_TOKEN_HEADER] = auth.rotated_token
+    return auth
+
+
 async def device_auth(request: Request, response: Response, rt: Rt) -> DeviceAuth:
+    header = request.headers.get("authorization")
+    if header is not None:
+        return await _agent_auth(request, response, rt, header)
     token = request.cookies.get(DEVICE_COOKIE)
-    auth = await authenticate_device(rt.sm, token, utcnow()) if token else None
+    auth = await authenticate_device(rt.sm, token, utcnow(), kind="web") if token else None
     if auth is None:
         raise fail(401, "unauthorized")
     if auth.rotated_token:
@@ -156,6 +197,7 @@ async def _require_shift(s: AsyncSession, device_id: uuid.UUID) -> Shift:
 class PairBody(BaseModel):
     token: str | None = Field(default=None, max_length=128)
     code: str | None = Field(default=None, max_length=32)
+    client: Literal["web", "agent"] = "web"
 
 
 @router.post("/pair")
@@ -168,13 +210,20 @@ async def pair(body: PairBody, request: Request, response: Response, rt: Rt) -> 
         and await limiter.allow("pair-global", 100, 600)
     ):
         raise fail(429, "rate_limited")
+    if body.client == "agent":
+        # The agent token is returned in the body, so it must never reach a browser page.
+        if not rt.settings.agent_devices_enabled or "origin" in request.headers:
+            raise fail(400, "invalid_code")
+        agent_version(request, rt)
     try:
         paired = await redeem_pairing(
-            rt.sm, rt.crypto, token=body.token, short_code=body.code, now=utcnow()
+            rt.sm, rt.crypto, token=body.token, short_code=body.code, now=utcnow(), kind=body.client
         )
     except PairingError:
         get_logger().warning("cashier.pair_failed", peer_ip=ip)
         raise fail(400, "invalid_code") from None
+    if body.client == "agent":
+        return {"paired": True, "device_token": paired.token}
     set_device_cookie(response, paired.token)
     return {"paired": True}
 
@@ -363,6 +412,8 @@ class PushBody(BaseModel):
 
 @router.post("/push/subscribe")
 async def push_subscribe(body: PushBody, auth: Device_, rt: Rt) -> dict[str, Any]:
+    if auth.kind != "web":  # the agent shows its own overlay; Web Push is browser-only
+        raise fail(400, "bad_request")
     async with tenant_session(rt.sm, auth.tenant_id) as s:
         shift = await _require_shift(s, auth.device_id)
         await s.execute(delete(PushSubscription).where(PushSubscription.shift_id == shift.id))

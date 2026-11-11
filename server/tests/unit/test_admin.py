@@ -457,3 +457,35 @@ async def test_dev_ui_only_when_enabled(admin: ApiHarness, world: Any, mailer: M
         r = await c.get("/dev/ui")
     assert r.status_code == 200
     assert "Компонентуудын жагсаалт" in r.text
+
+
+async def test_agent_pairing_kind_only_when_enabled(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any, mailer: Mailer
+) -> None:
+    h, csrf, _ = owner
+    assert 'name="kind"' not in (await h.client.get("/devices")).text
+    data = {"csrf": csrf, "device_name": "Касс-4", "group_ids": [str(world.group_id)]}
+    assert (await h.client.post("/devices/pair", data={**data, "kind": "agent"})).status_code == 400
+
+    on = await ApiHarness.create(world, mailer.dns, base_url=ADMIN, agent_devices=True)
+    try:
+        member_id, login, secret = await make_admin(world, "owner")
+        csrf_on = await admin_login(on, login, secret)
+        assert 'name="kind" value="agent"' in (await on.client.get("/devices")).text
+        r = await on.client.post(
+            "/devices/pair",
+            data={"csrf": csrf_on, "device_name": "Касс-4", "group_ids": [str(world.group_id)],
+                  "kind": "agent"},
+        )  # fmt: skip
+        assert r.status_code == 200
+        assert re.search(r"[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}", r.text)
+        assert "/pair#t=" not in r.text  # no QR link for agents
+        assert "<svg" not in r.text
+        assert "касс програм" in r.text
+        codes = await world.rows("pairing_code")
+        assert [c["kind"] for c in codes] == ["agent"]
+        audit = [a for a in await world.rows("audit_log") if a["action"] == "device.pairing_code"]
+        assert audit[-1]["meta"] == {"kind": "agent"}
+        assert member_id
+    finally:
+        await on.close()

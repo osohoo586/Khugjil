@@ -123,12 +123,28 @@ class SecurityHeaders:
 
 
 class OriginGuard:
+    """Rejects state-changing requests from other origins.
+
+    With ``allow_non_browser`` (cashier API, only while desktop agents are enabled), a request with
+    neither an ``Origin`` nor a ``Cookie`` header also passes: browsers attach ``Origin`` to every
+    POST, so such a request comes from a non-browser client (the agent's Rust core) and carries no
+    ambient credential that a forged request could abuse.
+    """
+
     UNSAFE = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
-    def __init__(self, app: ASGIApp, origin: str, exempt_prefixes: tuple[str, ...] = ()) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        origin: str,
+        exempt_prefixes: tuple[str, ...] = (),
+        *,
+        allow_non_browser: bool = False,
+    ) -> None:
         self.app = app
         self.origin = origin.encode()
         self.exempt = exempt_prefixes
+        self.allow_non_browser = allow_non_browser
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (
@@ -136,8 +152,10 @@ class OriginGuard:
             and scope.get("method") in self.UNSAFE
             and not any(scope.get("path", "").startswith(p) for p in self.exempt)
         ):
-            origin = dict(scope.get("headers", [])).get(b"origin")
-            if origin != self.origin:
+            headers = dict(scope.get("headers", []))
+            origin = headers.get(b"origin")
+            non_browser = origin is None and b"cookie" not in headers
+            if origin != self.origin and not (self.allow_non_browser and non_browser):
                 await _plain(send, 403, b"Forbidden")
                 return
         await self.app(scope, receive, send)

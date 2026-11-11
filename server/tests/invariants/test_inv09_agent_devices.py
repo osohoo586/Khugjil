@@ -20,12 +20,10 @@ import pytest
 
 from tests.fixtures.api import APP, PIN, ApiHarness
 from tests.fixtures.emails import FakeTxn, Mailer
-from tests.invariants.helpers import pending
 
 pytestmark = [pytest.mark.invariant(9), pytest.mark.db]
 
 DEVICE_COOKIE = "__Host-khj_dev"
-PENDING = pending("Phase 2 agent devices")
 
 
 @pytest.fixture
@@ -44,7 +42,6 @@ async def _agent_device(world: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------- pairing
 
 
-@PENDING
 async def test_agent_pairing_returns_token_in_body_and_no_cookie(
     api: ApiHarness, world: Any
 ) -> None:
@@ -62,7 +59,6 @@ async def test_agent_pairing_returns_token_in_body_and_no_cookie(
     assert info.json()["device_name"] == "Касс-API"
 
 
-@PENDING
 async def test_web_pairing_never_returns_a_token_in_the_body(api: ApiHarness) -> None:
     pairing = await api.new_pairing(kind="web")
     r = await api.client.post("/api/v1/pair", json={"token": pairing.token})
@@ -71,7 +67,6 @@ async def test_web_pairing_never_returns_a_token_in_the_body(api: ApiHarness) ->
     assert f"{DEVICE_COOKIE}=" in r.headers["set-cookie"]
 
 
-@PENDING
 async def test_pairing_code_is_bound_to_its_kind(api: ApiHarness) -> None:
     web, agent = await api.new_pairing(kind="web"), await api.new_pairing(kind="agent")
     async with api.agent_client() as c:
@@ -88,7 +83,6 @@ async def test_pairing_code_is_bound_to_its_kind(api: ApiHarness) -> None:
     assert ok.status_code == 200
 
 
-@PENDING
 async def test_agent_short_code_pairing(api: ApiHarness) -> None:
     pairing = await api.new_pairing(kind="agent")
     async with api.agent_client() as c:
@@ -103,7 +97,6 @@ async def test_agent_short_code_pairing(api: ApiHarness) -> None:
 # ---------------------------------------------------------------- token transport binding
 
 
-@PENDING
 async def test_web_cookie_token_is_not_accepted_as_bearer(api: ApiHarness) -> None:
     pairing = await api.new_pairing(kind="web")
     r = await api.client.post("/api/v1/pair", json={"token": pairing.token})
@@ -113,7 +106,6 @@ async def test_web_cookie_token_is_not_accepted_as_bearer(api: ApiHarness) -> No
         assert (await c.get("/api/v1/device")).status_code == 401
 
 
-@PENDING
 async def test_agent_token_is_not_accepted_as_cookie(api: ApiHarness) -> None:
     token = await api.pair_agent()
     async with httpx.AsyncClient(
@@ -125,7 +117,6 @@ async def test_agent_token_is_not_accepted_as_cookie(api: ApiHarness) -> None:
         assert (await c.get("/api/v1/device")).status_code == 401
 
 
-@PENDING
 async def test_bearer_request_with_origin_header_is_refused(api: ApiHarness) -> None:
     token = await api.pair_agent()
     async with api.agent_client(token) as c:
@@ -135,7 +126,6 @@ async def test_bearer_request_with_origin_header_is_refused(api: ApiHarness) -> 
         assert (await c.get("/api/v1/device")).status_code == 200
 
 
-@PENDING
 async def test_bearer_and_cookie_together_are_refused(api: ApiHarness) -> None:
     token = await api.pair_agent()
     async with api.agent_client(token) as c:
@@ -143,7 +133,6 @@ async def test_bearer_and_cookie_together_are_refused(api: ApiHarness) -> None:
     assert r.status_code == 401
 
 
-@PENDING
 async def test_malformed_authorization_headers_are_refused(api: ApiHarness) -> None:
     token = await api.pair_agent()
     async with api.agent_client() as c:
@@ -161,7 +150,6 @@ async def test_cookie_posts_without_origin_are_still_blocked(api: ApiHarness) ->
     assert r.status_code == 403
 
 
-@PENDING
 async def test_revoked_agent_token_stops_working(api: ApiHarness, world: Any) -> None:
     from khugjil.auth.devices import revoke_device
     from khugjil.db.tenancy import tenant_session
@@ -180,7 +168,6 @@ async def test_revoked_agent_token_stops_working(api: ApiHarness, world: Any) ->
 # ---------------------------------------------------------------- tenant isolation
 
 
-@PENDING
 async def test_agent_never_sees_other_tenant_data(
     api: ApiHarness, world: Any, other_world: Any, mailer: Mailer
 ) -> None:
@@ -206,7 +193,6 @@ async def test_agent_never_sees_other_tenant_data(
     assert "acked" not in {d["status"] for d in await other_world.rows("delivery")}
 
 
-@PENDING
 async def test_agent_token_of_one_tenant_resolves_only_that_tenant(
     api: ApiHarness, world: Any, other_world: Any
 ) -> None:
@@ -221,7 +207,6 @@ async def test_agent_token_of_one_tenant_resolves_only_that_tenant(
 # ---------------------------------------------------------------- delivery + consent (§3.10)
 
 
-@PENDING
 async def test_agent_delivery_requires_consent_and_shift(
     api: ApiHarness, world: Any, mailer: Mailer
 ) -> None:
@@ -241,7 +226,6 @@ async def test_agent_delivery_requires_consent_and_shift(
     assert all(d["target_id"] != device["id"] for d in rows)
 
 
-@PENDING
 async def test_agent_devices_get_no_web_push(api: ApiHarness) -> None:
     token = await api.agent_ready()
     body = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "p" * 20, "auth": "a" * 16}}
@@ -253,7 +237,6 @@ async def test_agent_devices_get_no_web_push(api: ApiHarness) -> None:
 # ---------------------------------------------------------------- version gate
 
 
-@PENDING
 async def test_agent_version_gate(api: ApiHarness) -> None:
     token = await api.pair_agent()
     for version in (None, "", "0.0.9", "garbage", "1.2", "01.0.0", "0.1.0-rc1"):
@@ -270,7 +253,6 @@ async def test_agent_version_gate(api: ApiHarness) -> None:
 # ---------------------------------------------------------------- feature flag off
 
 
-@PENDING
 async def test_flag_off_disables_agent_pairing_and_bearer_auth(
     api: ApiHarness, world: Any, mailer: Mailer
 ) -> None:

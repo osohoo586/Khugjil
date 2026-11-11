@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import time, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import HTMLResponse, Response
@@ -358,6 +358,7 @@ async def devices(ctx: Manager) -> HTMLResponse:
         groups=list(groups.values()),
         on_shift={k: names.get(v, "") for k, v in on_shift.items()},
         online={d.id: online(d, now) for d in rows},
+        agent_enabled=ctx.rt.settings.agent_devices_enabled,
     )
 
 
@@ -366,7 +367,10 @@ async def device_pair(
     ctx: Manager,
     device_name: Annotated[str, Form(min_length=1, max_length=60)],
     group_ids: Annotated[list[uuid.UUID], Form()] = [],  # noqa: B006
+    kind: Annotated[Literal["web", "agent"], Form()] = "web",
 ) -> HTMLResponse:
+    if kind == "agent" and not ctx.rt.settings.agent_devices_enabled:
+        raise HTTPException(400)
     try:
         async with ctx.session() as s:
             pairing = await create_pairing(
@@ -377,6 +381,7 @@ async def device_pair(
                 group_ids=group_ids,
                 created_by=ctx.member.id,
                 now=utcnow(),
+                kind=kind,
             )
             await ctx.audit(
                 s,
@@ -384,15 +389,18 @@ async def device_pair(
                 object_type="pairing_code",
                 object_id=pairing.pairing_id,
                 label=device_name,
+                meta={"kind": kind},
             )
     except PairingError:
         raise HTTPException(400) from None
-    url = f"https://{ctx.rt.settings.app_host}/pair#t={pairing.token}"
+    # Agent codes are typed into the desktop program; there is no QR link to open in a browser.
+    url = f"https://{ctx.rt.settings.app_host}/pair#t={pairing.token}" if kind == "web" else None
     template = "_pair_dialog.html" if ctx.request.headers.get("hx-request") else "pair.html"
     return ctx.render(
         template,
         pairing=pairing,
         url=url,
+        kind=kind,
         device_name=device_name,
         app_host=ctx.rt.settings.app_host,
     )
