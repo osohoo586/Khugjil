@@ -10,6 +10,7 @@ Hardening beyond plain DKIM verification:
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Callable, Iterable
 
@@ -90,6 +91,32 @@ def arc_pass(raw: bytes, domains: Iterable[str], dnsfunc: DnsFunc) -> bool:
     aar = top.get("aar-value", b"")
     text = aar.decode("utf-8", "replace") if isinstance(aar, bytes) else str(aar)
     return _aar_records_pass(text, {d.lower() for d in domains})
+
+
+def bank_signature_id(raw: bytes, domains: Iterable[str]) -> str | None:
+    """A stable id for "this exact bank-signed message": SHA-256 of the bank signature's ``b=``.
+
+    For banks whose emails carry no transaction number (Golomt), this is the idempotency
+    material: a replayed or re-forwarded copy has the same signature, a different genuine email
+    never does, and nobody can mint a new one without the bank's key. Call it only after
+    ``authenticate`` passed; it does not verify anything itself.
+    """
+    wanted = {d.lower().encode() for d in domains}
+    try:
+        verifier = dkim.DKIM(raw, minkey=1024)
+    except Exception:
+        return None
+    for k, value in verifier.headers:
+        if k.lower() != b"dkim-signature":
+            continue
+        try:
+            tags = parse_tag_value(value)
+        except InvalidTagValueList:
+            continue
+        if tags.get(b"d", b"").strip().lower() in wanted and tags.get(b"b"):
+            b = re.sub(rb"\s+", b"", tags[b"b"])
+            return hashlib.sha256(b).hexdigest()
+    return None
 
 
 def authenticate(raw: bytes, domains: Iterable[str], dnsfunc: DnsFunc) -> bool:

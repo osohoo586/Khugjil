@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     bank_senders: tuple[str, ...] = Field(min_length=1)
     bank_dkim_domains: tuple[str, ...] = Field(min_length=1)
     bank_subject_re: str = Field(min_length=1)
+    # Which bank's notification layout to parse (one bank per deployment for now).
+    bank_parser: Literal["khan_v1", "golomt_v1"] = "khan_v1"
 
     retention_days: int = Field(default=90, ge=1, le=3650)
     ingest_event_retention_days: int = Field(default=30, ge=1, le=365)

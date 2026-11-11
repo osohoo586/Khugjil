@@ -65,6 +65,7 @@ REASON_LABELS = {
     Reason.SUBJECT_MISMATCH: "Татгалзсан — гарчиг таарахгүй",
     Reason.TEMPLATE_MISMATCH: "Татгалзсан — формат таарахгүй",
     Reason.AMOUNT_MISMATCH: "Татгалзсан — дүн таарахгүй",
+    Reason.NOT_INCOME: "Алгассан — зарлагын гүйлгээ",
     Reason.FWD_CONFIRM_STORED: "Gmail-ийн баталгаажуулах код ирсэн",
 }
 

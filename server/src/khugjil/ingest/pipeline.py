@@ -37,6 +37,7 @@ from khugjil.ingest.checks import (
     Evaluation,
     ForwardingCode,
     evaluate,
+    masked_match,
 )
 from khugjil.ingest.dkim_arc import DnsFunc
 from khugjil.ingest.reasons import TEMPLATE_CHANGE_REASONS, Reason
@@ -101,7 +102,14 @@ async def ingest(deps: IngestDeps, rcpt: str, raw: bytes, transport: str = "smtp
     async with tenant_session(deps.sessionmaker, tenant_id) as s:
         tenant = await s.get(Tenant, tenant_id)
         rows = (
-            await s.execute(select(BankAccount.id, BankAccount.number_hmac, BankAccount.status))
+            await s.execute(
+                select(
+                    BankAccount.id,
+                    BankAccount.number_hmac,
+                    BankAccount.number_enc,
+                    BankAccount.status,
+                )
+            )
         ).all()
     if tenant is None:  # pragma: no cover - resolver only returns existing tenants
         return Outcome(Reason.RCPT_UNKNOWN)
@@ -109,8 +117,19 @@ async def ingest(deps: IngestDeps, rcpt: str, raw: bytes, transport: str = "smtp
         r.number_hmac: AccountMatch(account_id=r.id, active=r.status == "active") for r in rows
     }
 
-    def lookup(canonical: str) -> AccountMatch | None:
-        return accounts.get(deps.crypto.hmac(Purpose.ACCOUNT_HMAC, tenant_id, canonical))
+    def lookup(value: str) -> AccountMatch | None:
+        if "*" not in value:
+            return accounts.get(deps.crypto.hmac(Purpose.ACCOUNT_HMAC, tenant_id, value))
+        # Banks that mask the number (Golomt): compare against the shop's own numbers, which
+        # are decrypted only here, in memory, and only for such an email.
+        aad = field_aad(tenant_id, "bank_account", "number_enc")
+        numbers = {
+            deps.crypto.decrypt_str(r.number_enc, aad): AccountMatch(
+                account_id=r.id, active=r.status == "active"
+            )
+            for r in rows
+        }
+        return masked_match(value, numbers)
 
     result: Evaluation = await asyncio.to_thread(
         evaluate,

@@ -145,6 +145,72 @@ def build_message(
     return msg.as_bytes(policy=SMTP)
 
 
+# ---------------------------------------------------------------- Golomt "Easy Info" (golomt_v1)
+
+GOLOMT_ACCOUNT_MASKED = "222*****22"  # TENANT_ACCOUNT 2222222222 as Golomt prints it
+
+
+@dataclass(frozen=True)
+class FakeGolomt:
+    """Fake Golomt Easy Info notification, after the layout the shop owner described."""
+
+    kind: str = "ОРЛОГЫН ГҮЙЛГЭЭ"
+    amount: str = "+2,000.00 MNT"
+    date: str = "2026-10-15"
+    account: str = GOLOMT_ACCOUNT_MASKED
+    description: str = "Худалдан авалт"
+    balance: str = "Үлдэгдэл: *******"
+    preamble: tuple[str, ...] = ()
+    footer: tuple[str, ...] = ()
+    split_labels: bool = True  # the amount label on its own line, like the sample
+
+    def with_(self, **kw: object) -> FakeGolomt:
+        return replace(self, **kw)  # type: ignore[arg-type]
+
+
+def golomt_rows(g: FakeGolomt) -> list[list[str]]:
+    out: list[list[str]] = [[p] for p in g.preamble] + [[g.kind]]
+    if g.split_labels:
+        out += [["Гүйлгээний дүн:"], [g.amount]]
+    else:
+        out += [["Гүйлгээний дүн:", g.amount]]
+    out += [
+        [f"Гүйлгээний огноо:{g.date}"],
+        [f"Дансны дугаар: {g.account}"],
+        [f"Гүйлгээний утга: {g.description}"],
+        [g.balance],
+    ]
+    return out + [[f] for f in g.footer]
+
+
+def build_golomt_message(
+    g: FakeGolomt | None = None,
+    *,
+    fmt: str = "plain",
+    subject: str = FAKE_SUBJECT,
+    message_id: str = "<fake-golomt-1@bank.example>",
+    date: str = "Thu, 15 Oct 2026 14:05:09 +0800",
+) -> bytes:
+    g = g or FakeGolomt()
+    msg = EmailMessage()
+    msg["From"] = FAKE_BANK_SENDER
+    msg["To"] = "shop.owner@gmail.example"
+    msg["Subject"] = subject
+    msg["Date"] = date
+    msg["Message-ID"] = message_id
+    if fmt == "html":
+        trs = "".join(
+            "<tr>" + "".join(f"<td>{html.escape(c)}</td>" for c in r) + "</tr>"
+            for r in golomt_rows(g)
+        )
+        msg.set_content(f"<html><body><table>{trs}</table></body></html>", subtype="html",
+                        charset="utf-8", cte="base64")  # fmt: skip
+    else:
+        text = "\r\n".join("  ".join(r) for r in golomt_rows(g)) + "\r\n"
+        msg.set_content(text, charset="utf-8", cte="base64")
+    return msg.as_bytes(policy=SMTP)
+
+
 def _keypair() -> tuple[bytes, bytes]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     priv = key.private_bytes(
@@ -205,6 +271,9 @@ class Mailer:
 
     def bank_mail(self, t: FakeTxn | None = None, **kw: object) -> bytes:
         return self.dkim_sign(build_message(t, **kw))  # type: ignore[arg-type]
+
+    def golomt_mail(self, g: FakeGolomt | None = None, **kw: object) -> bytes:
+        return self.dkim_sign(build_golomt_message(g, **kw))  # type: ignore[arg-type]
 
     def gmail_forward(
         self,

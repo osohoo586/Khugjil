@@ -20,6 +20,7 @@ class Reason(StrEnum):
     NOT_TENANT_ACCOUNT = "NOT_TENANT_ACCOUNT"  # f
     ACCOUNT_INACTIVE = "ACCOUNT_INACTIVE"  # f
     OWN_TRANSFER = "OWN_TRANSFER"  # f
+    NOT_INCOME = "NOT_INCOME"  # e: an expense notification (banks that also report those)
     AMOUNT_MISMATCH = "AMOUNT_MISMATCH"  # g
     DUPLICATE = "DUPLICATE"
     ACCEPTED = "ACCEPTED"
