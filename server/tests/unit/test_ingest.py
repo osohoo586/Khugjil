@@ -207,11 +207,25 @@ def _msg(**kw: object) -> EmailMessage:
     return m
 
 
-def test_inspect_rejects_non_text_parts() -> None:
+def test_inspect_skips_logo_images_but_rejects_other_parts() -> None:
+    """PLAN Q8 (owner, 2026-11-11): PNG/JPEG/GIF logos are skipped unread; SVG, PDF and the like
+    still drop the email."""
     m = _msg()
     m.set_content("hello")
     m.add_related(b"\x89PNG", maintype="image", subtype="png", cid="<logo>")
-    assert mime.inspect_bodies(m, 100) == Reason.ATTACHMENT
+    bodies = mime.inspect_bodies(m, 100)
+    assert not isinstance(bodies, Reason)
+    assert bodies.plain is not None
+    assert bodies.plain.strip() == "hello"
+    attached = _msg()
+    attached.set_content("hello")
+    attached.add_attachment(b"GIF89a", maintype="image", subtype="gif", filename="logo.gif")
+    assert not isinstance(mime.inspect_bodies(attached, 100), Reason)
+    for maintype, subtype in (("image", "svg+xml"), ("application", "pdf"), ("text", "calendar")):
+        other = _msg()
+        other.set_content("hello")
+        other.add_attachment(b"x", maintype=maintype, subtype=subtype, filename="x")
+        assert mime.inspect_bodies(other, 100) == Reason.ATTACHMENT, subtype
 
 
 def test_inspect_rejects_deep_nesting() -> None:

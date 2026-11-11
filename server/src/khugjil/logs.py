@@ -51,6 +51,8 @@ ALLOWED_KEYS: frozenset[str] = frozenset(
         "fwd_digits",
         # DKIM d= domains of an allowed bank sender's email that failed check c (no content).
         "dkim_domains",
+        # MIME types of a signed bank email dropped for an attachment (no content).
+        "mime_shape",
     }
 )
 _EVENT_RE = re.compile(r"^[a-z][a-z0-9_.]{0,63}$")

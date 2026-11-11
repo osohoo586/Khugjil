@@ -808,6 +808,7 @@ All of this is done in small commits. Q1–Q3 only block **going live**, not cod
 **B. Email structure (describe it, don't paste it)**
 
 - **Q8.** Is the email HTML only, plain text only, or both? Does it contain images or other MIME parts, such as a logo? The plan allows only text parts. If there is an inline logo, should it be tolerated (never read), or should such emails be dropped?
+  - **Answered (2026-11-11, Golomt):** Golomt's Easy Info email carries a logo image. PNG/JPEG/GIF parts are skipped without being decoded or read; SVG and any other non-text part still drop the email.
 - **Q9.** How do account numbers appear: 10 plain digits, IBAN (`MN…`), or masked?
 - **Q10.** Does the payer receive a similar email for the same transfer? If so, is its subject different? This matters for S3.
 - **Q11.** Does the email contain a balance line (Үлдэгдэл) or other lines that are not in the SPEC §4 sample? Should the UI show `Огноо/Date` or `Системийн огноо/System Date`? The plan shows `Огноо/Date` and uses System Date only in the idempotency key.

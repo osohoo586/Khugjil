@@ -22,6 +22,10 @@ MAX_MIME_DEPTH = 5
 MAX_HTML_NODES = 20_000
 MAX_ROWS = 2_000
 _ALLOWED_LEAF_TYPES = frozenset({"text/plain", "text/html"})
+# Banks attach their logo (Golomt does). With the owner's approval (PLAN Q8, 2026-11-11) such
+# raster images are skipped: never decoded, never read. SVG (scriptable) and every other
+# non-text part still count as attachments and drop the email.
+_SKIPPED_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif"})
 _ALLOWED_MULTIPART = frozenset({"multipart/alternative", "multipart/mixed", "multipart/related"})
 
 Rows = list[list[str]]
@@ -71,6 +75,8 @@ def _leaves(part: Message, depth: int) -> list[Message] | Reason:
                 return got
             out.extend(got)
         return out
+    if ctype in _SKIPPED_IMAGE_TYPES:
+        return []
     if part.get_filename() is not None or part.get_content_disposition() == "attachment":
         return Reason.ATTACHMENT
     if ctype not in _ALLOWED_LEAF_TYPES:
@@ -79,7 +85,8 @@ def _leaves(part: Message, depth: int) -> list[Message] | Reason:
 
 
 def inspect_bodies(msg: EmailMessage, raw_len: int) -> Bodies | Reason:
-    """Check d: only text leaves, size limits, bounded nesting. Returns decoded bodies."""
+    """Check d: only text leaves (logo images skipped unread), size limits, bounded nesting.
+    Returns decoded bodies."""
     if raw_len > MAX_MESSAGE_BYTES:
         return Reason.TOO_LARGE
     leaves = _leaves(msg, 0)

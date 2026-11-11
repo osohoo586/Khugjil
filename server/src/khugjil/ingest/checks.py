@@ -29,6 +29,7 @@ from khugjil.ingest.dkim_arc import (
     signature_domains,
 )
 from khugjil.ingest.forwarding import confirmation_code, sender_address
+from khugjil.ingest.forwarding import shape as mime_shape
 from khugjil.ingest.parsers import golomt_v1, khan_v1
 from khugjil.ingest.reasons import Reason
 from khugjil.ingest.sanitize import clean_text, sanitize_description
@@ -248,6 +249,8 @@ def evaluate(
     # d: text-only MIME, size limits.
     bodies = mime.inspect_bodies(msg, len(raw))
     if isinstance(bodies, Reason):
+        if bodies == Reason.ATTACHMENT:  # a signed bank email: record its MIME types only
+            get_logger().info("ingest.mime_shape", mime_shape=mime_shape(msg))
         return drop(bodies)
 
     # e: deny-list on subject, subject pattern, template, deny-list on body minus description.

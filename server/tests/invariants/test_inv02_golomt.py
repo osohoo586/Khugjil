@@ -179,3 +179,23 @@ async def test_pipeline_stores_golomt_income_once(world: Any, mailer: Mailer) ->
     dump = await world.dump_all_text()
     assert "9,876,543.21" not in dump
     assert "9876543" not in dump
+
+
+@pytest.mark.parametrize("fmt", ["plain", "html"])
+def test_logo_image_is_skipped_but_other_attachments_drop(
+    mailer: Mailer, fmt: str, log_capture: Any
+) -> None:
+    """PLAN Q8 (owner, 2026-11-11): Golomt attaches its logo; images are skipped unread. A PDF
+    still drops the email, and only its MIME types are logged."""
+    import json
+
+    from khugjil.ingest.checks import Accepted
+
+    assert isinstance(evaluate(mailer.golomt_mail(fmt=fmt, logo=True), mailer), Accepted)
+    raw = mailer.golomt_mail(FakeGolomt(description="MARKER"), fmt=fmt, pdf=True)
+    assert str(evaluate(raw, mailer).reason) == "ATTACHMENT"
+    out = log_capture.getvalue()
+    assert "MARKER" not in out
+    shapes = [json.loads(x)["mime_shape"] for x in out.splitlines() if "ingest.mime_shape" in x]
+    assert shapes
+    assert "application/pdf" in shapes[-1]

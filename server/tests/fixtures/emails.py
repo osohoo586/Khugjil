@@ -190,6 +190,8 @@ def build_golomt_message(
     subject: str = FAKE_SUBJECT,
     message_id: str = "<fake-golomt-1@bank.example>",
     date: str = "Thu, 15 Oct 2026 14:05:09 +0800",
+    logo: bool = False,
+    pdf: bool = False,
 ) -> bytes:
     g = g or FakeGolomt()
     msg = EmailMessage()
@@ -208,6 +210,11 @@ def build_golomt_message(
     else:
         text = "\r\n".join("  ".join(r) for r in golomt_rows(g)) + "\r\n"
         msg.set_content(text, charset="utf-8", cte="base64")
+    if logo:  # like Gmail's "Attachments": the bank's logo image
+        msg.add_related(b"\x89PNG\r\n\x1a\nfake", maintype="image", subtype="png", cid="<logo>")
+    if pdf:
+        msg.add_attachment(b"%PDF-1.4 fake", maintype="application", subtype="pdf",
+                           filename="statement.pdf")  # fmt: skip
     return msg.as_bytes(policy=SMTP)
 
 
