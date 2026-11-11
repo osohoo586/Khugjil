@@ -138,9 +138,6 @@ if [ -z "$TID" ]; then
   cloudflared tunnel create "$TUNNEL" >/dev/null
   TID="$(tunnel_id)"
 fi
-for host in "$ADMIN_HOST" "$APP_HOST"; do
-  cloudflared tunnel route dns "$TUNNEL" "$host" >/dev/null 2>&1 || true  # exists already: fine
-done
 cat >"$STATE/cloudflared.yml" <<EOF
 tunnel: $TID
 credentials-file: $HOME/.cloudflared/$TID.json
@@ -151,6 +148,12 @@ ingress:
     service: http://127.0.0.1:8180
   - service: http_status:404
 EOF
+# Always pass our own config and the tunnel id: otherwise cloudflared reads ~/.cloudflared/config.yml
+# (another project's tunnel) and points these names at that tunnel instead.
+for host in "$ADMIN_HOST" "$APP_HOST"; do
+  cloudflared tunnel --config "$STATE/cloudflared.yml" route dns --overwrite-dns "$TID" "$host" \
+    >/dev/null 2>&1 || echo "  could not route $host (see: cloudflared tunnel route dns)"
+done
 if ! { [ -f "$STATE/tunnel.pid" ] && kill -0 "$(cat "$STATE/tunnel.pid")" 2>/dev/null; }; then
   nohup cloudflared tunnel --no-autoupdate --config "$STATE/cloudflared.yml" run "$TUNNEL" \
     </dev/null >"$STATE/tunnel.log" 2>&1 &
