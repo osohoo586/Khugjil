@@ -10,7 +10,9 @@
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains"
 		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
+		# same-origin, not no-referrer: no-referrer makes browsers send "Origin: null" on our own
+		# form posts, which the server's Origin check refuses. Other sites still get no referrer.
+		Referrer-Policy same-origin
 		X-Frame-Options DENY
 		Cross-Origin-Opener-Policy same-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"

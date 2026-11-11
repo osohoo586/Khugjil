@@ -312,7 +312,7 @@ The fake email builder renders the SPEC §4 sample (and variants) to HTML, signs
 - **Containers.** Docker Compose. Every container runs as non-root with `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges` and a small `tmpfs` for `/tmp`.
 - **Firewall.** ufw opens only 25 and 443; SSH is handled per Q33. fail2ban has jails for sshd, SMTP RCPT and rate-limit failures, and admin sign-in failures.
 - **Caddy headers** (per origin):
-  - HSTS, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff` and a restrictive `Permissions-Policy`. SSE is passed through without buffering.
+  - HSTS, `Referrer-Policy: same-origin` (changed from `no-referrer` on 2026-11-11: with `no-referrer`, browsers send `Origin: null` on same-origin form posts, so the Origin check refused every admin form), `X-Content-Type-Options: nosniff` and a restrictive `Permissions-Policy`. SSE is passed through without buffering.
   - Admin CSP: `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`.
   - Cashier CSP: the admin CSP plus `manifest-src 'self'; worker-src 'self'; media-src 'self'; require-trusted-types-for 'script'`.
 - **Backups.** A nightly `pg_dump`, encrypted with `age` to a public key whose private half stays offline. Backups are kept no longer than transactions, so purged rows age out of backups too (Q32). Keys from the `.env` file are never in the backup.
@@ -474,7 +474,7 @@ audit_log                id, tenant_id, actor_kind (member|operator|system), act
 | I6 | Notification content on lock screens or in Telegram (not end-to-end encrypted) | Disclosed on the consent page; Telegram is owners only; Web Push payload is encrypted in transit | Consent text review |
 | I7 | Database or backup theft | Encrypted fields with keys outside the database; age-encrypted backups; backup retention ≤ transaction retention | Restore drill |
 | I8 | Secrets in the repo or in chat | Only the `.env` file, which you create; `.env.example` has names only; never requested in chat | Secret-scan step in CI |
-| I9 | Tokens leak through URLs or Referer | Pairing and invite tokens in URL fragments; `Referrer-Policy: no-referrer`; access log without query strings | Log test |
+| I9 | Tokens leak through URLs or Referer | Pairing and invite tokens in URL fragments (never sent in Referer); `Referrer-Policy: same-origin`, so other sites get no referrer; access log without query strings | Log test, header test |
 | I10 | Cloudflare fallback exposes raw email to a third party | Used only if Q4 requires it; the Worker never logs or stores; documented to the owner | — |
 
 **D: Denial of service**

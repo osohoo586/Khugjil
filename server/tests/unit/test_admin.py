@@ -489,3 +489,16 @@ async def test_agent_pairing_kind_only_when_enabled(
         assert member_id
     finally:
         await on.close()
+
+
+async def test_referrer_policy_keeps_same_origin_form_posts_working(admin: ApiHarness) -> None:
+    """With `no-referrer`, browsers send `Origin: null` on same-origin form posts (Fetch spec,
+    "serializing a request origin"), and the Origin guard refuses them: the login form broke in
+    real browsers. `same-origin` sends the real origin to us and no referrer to anyone else."""
+    r = await admin.client.get("/login")
+    assert r.headers["referrer-policy"] == "same-origin"
+    data = {"login_name": "nobody", "password": "x" * 12}
+    refused = await admin.client.post("/login", data=data, headers={"origin": "null"})
+    assert refused.status_code == 403  # the guard itself stays strict
+    allowed = await admin.client.post("/login", data=data)
+    assert allowed.status_code != 403

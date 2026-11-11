@@ -86,7 +86,9 @@ class HostDispatcher:
 BASE_HEADERS = {
     "strict-transport-security": "max-age=63072000; includeSubDomains",
     "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
+    # Not "no-referrer": with it, browsers send `Origin: null` on same-site form posts and the
+    # OriginGuard refuses every admin form. "same-origin" still sends nothing to other sites.
+    "referrer-policy": "same-origin",
     "x-frame-options": "DENY",
     "cross-origin-opener-policy": "same-origin",
     "cross-origin-resource-policy": "same-origin",
