@@ -37,6 +37,11 @@ class Settings(BaseSettings):
 
     env: Literal["development", "test", "production"] = "production"
     domain: str = Field(min_length=3)
+    # Optional explicit host names; by default app./admin./in. under KHJ_DOMAIN. Useful where only
+    # one subdomain level gets a certificate (e.g. behind Cloudflare: khugjil.usukh.shop).
+    app_hostname: str | None = None
+    admin_hostname: str | None = None
+    inbound_hostname: str | None = None
     master_key: SecretStr
     database_url: SecretStr
     redis_url: SecretStr
@@ -90,6 +95,17 @@ class Settings(BaseSettings):
         re.compile(v)
         return v
 
+    @field_validator("app_hostname", "admin_hostname", "inbound_hostname")
+    @classmethod
+    def _hostname(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip().lower()
+        label = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+        if not re.fullmatch(rf"{label}(?:\.{label})+", v):
+            raise ValueError("must be a host name like khugjil.example.com")
+        return v
+
     @field_validator("agent_min_version")
     @classmethod
     def _semver(cls, v: str) -> str:
@@ -114,6 +130,8 @@ class Settings(BaseSettings):
             raise ValueError("dev_routes must be disabled in production")
         if self.env == "production" and self.public_port not in (None, 443):
             raise ValueError("public_port is for local development only")
+        if self.app_host == self.admin_host:
+            raise ValueError("the cashier and admin hosts must differ (separate origins)")
         return self
 
     @cached_property
@@ -126,11 +144,11 @@ class Settings(BaseSettings):
 
     @property
     def app_host(self) -> str:
-        return f"app.{self.domain}"
+        return self.app_hostname or f"app.{self.domain}"
 
     @property
     def admin_host(self) -> str:
-        return f"admin.{self.domain}"
+        return self.admin_hostname or f"admin.{self.domain}"
 
     def _origin(self, host: str) -> str:
         port = f":{self.public_port}" if self.public_port not in (None, 443) else ""
@@ -147,4 +165,4 @@ class Settings(BaseSettings):
 
     @property
     def inbound_domain(self) -> str:
-        return f"in.{self.domain}"
+        return self.inbound_hostname or f"in.{self.domain}"

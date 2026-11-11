@@ -57,6 +57,28 @@ def test_public_port_is_development_only() -> None:
         make_settings(public_port=0)
 
 
+def test_explicit_host_names() -> None:
+    s = make_settings(
+        domain="khugjil.usukh.shop",
+        app_hostname="Khugjil-Kass.usukh.shop",
+        admin_hostname="khugjil.usukh.shop",
+        inbound_hostname="in.khugjil.usukh.shop",
+    )
+    assert (s.app_host, s.admin_host, s.inbound_domain) == (
+        "khugjil-kass.usukh.shop",
+        "khugjil.usukh.shop",
+        "in.khugjil.usukh.shop",
+    )
+    assert s.admin_origin == "https://khugjil.usukh.shop"
+    defaults = make_settings()
+    assert (defaults.app_host, defaults.inbound_domain) == ("app.khugjil.test", "in.khugjil.test")
+    for bad in ("https://x.example", "x", "a..b.example", "-a.example", "a b.example"):
+        with pytest.raises(ValidationError):
+            make_settings(app_hostname=bad)
+    with pytest.raises(ValidationError):  # same origin for cashier and admin is refused
+        make_settings(app_hostname="one.example", admin_hostname="one.example")
+
+
 def test_agent_settings() -> None:
     from khugjil.settings import parse_agent_version
 

@@ -8,6 +8,8 @@ that file. Generate key material locally with `cd server && uv run khugjil keys 
 |---|---|---|
 | `KHJ_ENV` | no | `production` (default), `development` or `test` |
 | `KHJ_DOMAIN` | yes | Base domain, `khugjil.usukh.shop` (PLAN Q7); `app.`, `admin.` and `in.` subdomains are derived from it |
+| `KHJ_APP_HOSTNAME`, `KHJ_ADMIN_HOSTNAME`, `KHJ_INBOUND_HOSTNAME` | no | Explicit host names instead of `app.`/`admin.`/`in.` under `KHJ_DOMAIN` (for example `khugjil-kass.usukh.shop`, `khugjil.usukh.shop`, `in.khugjil.usukh.shop` behind Cloudflare, whose free certificate covers one subdomain level). Cashier and admin must differ |
+| `KHJ_BANK_PARSER` | no | `khan_v1` (default) or `golomt_v1` (Golomt Bank Easy Info) |
 | `KHJ_MASTER_KEY` | yes | Base64 of exactly 32 random bytes; all field-encryption and HMAC keys derive from it |
 | `KHJ_DATABASE_URL` | yes | `postgresql+psycopg://khugjil_app:…@postgres:5432/khugjil` (non-owner role) |
 | `KHJ_REDIS_URL` | yes | `redis://redis:6379/0` |

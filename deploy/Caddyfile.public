@@ -1,0 +1,56 @@
+# This Mac as the server, published through a Cloudflare Tunnel (scripts/public-up.sh).
+# Cloudflare terminates HTTPS for the public names and the tunnel brings plain HTTP to this
+# Caddy on 127.0.0.1:8180 only; nothing listens on a public interface. Same sites as
+# deploy/Caddyfile otherwise. The admin API of Caddy stays inside its container.
+{
+	auto_https off
+	servers {
+		protocols h1 h2c
+	}
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		X-Content-Type-Options nosniff
+		# same-origin, not no-referrer: no-referrer makes browsers send "Origin: null" on our own
+		# form posts, which the server's Origin check refuses. Other sites still get no referrer.
+		Referrer-Policy same-origin
+		X-Frame-Options DENY
+		Cross-Origin-Opener-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+}
+
+http://{$KHJ_APP_HOSTNAME}:8180 {
+	import security
+	encode zstd gzip
+
+	@backend path /api/* /hooks/*
+	handle @backend {
+		reverse_proxy host.docker.internal:8100 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types khj"
+		@revalidate path / /index.html /sw.js /manifest.webmanifest /shared/tokens.css
+		header @revalidate Cache-Control "no-cache"
+		root * /srv/cashier
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+http://{$KHJ_ADMIN_HOSTNAME}:8180 {
+	import security
+	encode zstd gzip
+	reverse_proxy host.docker.internal:8100
+}
+
+# Any other Host header: nothing.
+http://:8180 {
+	respond 404
+}

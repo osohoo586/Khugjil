@@ -30,6 +30,7 @@ make agent-check              # desktop agent: capability guard, rustfmt, clippy
 ./scripts/dev-seed.sh         # demo data: 2 accounts, 2 cashiers (PIN 482913), today's history
 ./scripts/dev-seed.sh txn 15000 "Захиалга"   # one new transaction now (shows up live on the cashier)
 ./scripts/dev-down.sh         # stop it (--wipe also deletes the dev database)
+./scripts/public-up.sh        # this Mac as the server at https://khugjil.usukh.shop (docs/mac-server.md)
 ```
 
 The Windows desktop agent (Phase 2) lives in `agent/`; see [`docs/agent.md`](docs/agent.md).
