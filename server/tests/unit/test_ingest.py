@@ -47,14 +47,31 @@ def test_forwarding_confirmation_extracts_code_only(mailer: Mailer) -> None:
 def test_forwarding_confirmation_requires_google_dkim(mailer: Mailer) -> None:
     r = evaluate(forwarding_confirmation(), mailer)
     assert isinstance(r, Dropped)
-    assert r.reason == Reason.FROM_NOT_ALLOWED
+    assert r.reason == Reason.FWD_CONFIRM_AUTH_FAIL
 
 
-def test_forwarding_confirmation_requires_exact_subject(mailer: Mailer) -> None:
-    raw = forwarding_confirmation().replace(b"Gmail Forwarding Confirmation", b"Gmail Notice")
+def test_forwarding_confirmation_subject_needs_the_code(mailer: Mailer) -> None:
+    raw = forwarding_confirmation().replace(b"(#123456789) ", b"")
     r = evaluate(_google_signed(mailer, raw), mailer)
     assert isinstance(r, Dropped)
-    assert r.reason == Reason.FROM_NOT_ALLOWED
+    assert r.reason == Reason.FWD_CONFIRM_UNRECOGNIZED
+
+
+def test_forwarding_confirmation_in_another_language_and_with_html(mailer: Mailer) -> None:
+    from email.message import EmailMessage
+    from email.policy import SMTP
+
+    msg = EmailMessage()
+    msg["From"] = "Gmail-ийн баг <forwarding-noreply@google.com>"
+    msg["To"] = "fake@in.khugjil.test"
+    msg["Subject"] = "(#987654321) Gmail-ийн дамжуулалтын баталгаажуулалт"
+    msg["Date"] = "Thu, 15 Oct 2026 08:40:00 +0800"
+    msg["Message-ID"] = "<fwd-2@google.com>"
+    msg.set_content("Баталгаажуулах код: 987654321\r\n")
+    msg.add_alternative("<p>Баталгаажуулах код: 987654321</p>", subtype="html")
+    r = evaluate(_google_signed(mailer, msg.as_bytes(policy=SMTP)), mailer)
+    assert isinstance(r, ForwardingCode)
+    assert r.code.reveal() == "987654321"
 
 
 # ---------------------------------------------------------------- parser
@@ -268,10 +285,16 @@ def test_forwarding_rejects_variants(mailer: Mailer) -> None:
 
     base = forwarding_confirmation()
     assert check(base) == "123456789"
-    assert check(b"From: x@google.com\r\n" + base) is None
-    assert check(b"Subject: again\r\n" + base) is None
+    assert check(b"From: x@google.com\r\n" + base) is None  # two senders: not Gmail's
+    assert check(b"Subject: again\r\n" + base) == Reason.FWD_CONFIRM_UNRECOGNIZED
     multi = base.replace(b"Content-Type: text/plain", b"Content-Type: multipart/mixed; boundary=b")
-    assert check(multi) is None
+    assert check(multi) == Reason.FWD_CONFIRM_UNRECOGNIZED
+    empty_alt = base.replace(
+        b"Content-Type: text/plain", b"Content-Type: multipart/alternative; boundary=b"
+    )
+    assert check(empty_alt) == Reason.FWD_CONFIRM_UNRECOGNIZED
+    pdf = base.replace(b"Content-Type: text/plain", b"Content-Type: application/pdf")
+    assert check(pdf) == Reason.FWD_CONFIRM_UNRECOGNIZED
 
 
 def test_message_id_hash_survives_malformed_header() -> None:

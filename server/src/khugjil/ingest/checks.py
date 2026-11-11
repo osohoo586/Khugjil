@@ -218,6 +218,8 @@ def evaluate(
         return Dropped(reason, msgid)
 
     code = confirmation_code(msg, raw, dnsfunc)
+    if isinstance(code, Reason):
+        return drop(code)
     if code is not None:
         return ForwardingCode(Sensitive(code), msgid)
 

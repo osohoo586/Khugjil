@@ -8,6 +8,8 @@ class Reason(StrEnum):
 
     RCPT_UNKNOWN = "RCPT_UNKNOWN"  # a
     FWD_CONFIRM_STORED = "FWD_CONFIRM_STORED"
+    FWD_CONFIRM_UNRECOGNIZED = "FWD_CONFIRM_UNRECOGNIZED"  # from Gmail's forwarding sender
+    FWD_CONFIRM_AUTH_FAIL = "FWD_CONFIRM_AUTH_FAIL"  # ... but not DKIM-signed by google.com
     HEADER_DUPLICATE = "HEADER_DUPLICATE"  # b
     FROM_NOT_ALLOWED = "FROM_NOT_ALLOWED"  # b
     AUTH_FAIL = "AUTH_FAIL"  # c

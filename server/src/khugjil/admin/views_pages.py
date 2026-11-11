@@ -67,6 +67,8 @@ REASON_LABELS = {
     Reason.AMOUNT_MISMATCH: "Татгалзсан — дүн таарахгүй",
     Reason.NOT_INCOME: "Алгассан — зарлагын гүйлгээ",
     Reason.FWD_CONFIRM_STORED: "Gmail-ийн баталгаажуулах код ирсэн",
+    Reason.FWD_CONFIRM_UNRECOGNIZED: "Татгалзсан — Gmail-ийн баталгаажуулах имэйл танигдсангүй",
+    Reason.FWD_CONFIRM_AUTH_FAIL: "Татгалзсан — Gmail-ийн имэйлийн DKIM баталгаажаагүй",
 }
 
 
