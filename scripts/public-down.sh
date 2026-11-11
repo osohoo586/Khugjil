@@ -6,9 +6,13 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$ROOT/.dev/public"
 
+# Each recorded process together with its child (`uv run` may leave the child running); never the
+# local demo stack's processes, which run the same commands.
 for name in tunnel api worker; do
   if [ -f "$STATE/$name.pid" ]; then
-    kill "$(cat "$STATE/$name.pid")" 2>/dev/null
+    pid="$(cat "$STATE/$name.pid")"
+    pkill -P "$pid" 2>/dev/null
+    kill "$pid" 2>/dev/null
     rm -f "$STATE/$name.pid"
   fi
 done

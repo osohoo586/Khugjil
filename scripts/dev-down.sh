@@ -6,15 +6,18 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$ROOT/.dev"
 
+# Stop each recorded `uv run` process together with its child (uv may leave the child running).
+# Only processes this stack started: the Mac-server stack (scripts/public-up.sh) runs the same
+# commands and must keep running.
 for name in api worker; do
   if [ -f "$STATE/$name.pid" ]; then
-    kill "$(cat "$STATE/$name.pid")" 2>/dev/null
+    pid="$(cat "$STATE/$name.pid")"
+    pkill -P "$pid" 2>/dev/null
+    kill "$pid" 2>/dev/null
     rm -f "$STATE/$name.pid"
   fi
 done
-# `uv run` may leave its child running: stop only our own processes, matched by their command line.
-for pid in $(pgrep -f 'uvicorn khugjil.web.app:production_app' 2>/dev/null) \
-           $(pgrep -f 'bin/khugjil worker' 2>/dev/null); do
+for pid in $(pgrep -f 'uvicorn khugjil.web.app:production_app --factory --host 127.0.0.1 --port 8000' 2>/dev/null); do
   kill "$pid" 2>/dev/null
 done
 
