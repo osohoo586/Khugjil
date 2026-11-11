@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Khugjil",
+  "mainBinaryName": "khugjil-agent",
+  "version": "0.1.0",
+  "identifier": "shop.usukh.khugjil.agent",
+  "build": {
+    "frontendDist": "../../cashier/dist-agent",
+    "beforeBuildCommand": "cd ../cashier && npm ci && npm run build:agent"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": {
+        "default-src": "'none'",
+        "script-src": "'self'",
+        "style-src": "'self'",
+        "font-src": "'self'",
+        "img-src": "'self'",
+        "media-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'",
+        "require-trusted-types-for": "'script'",
+        "trusted-types": "khj"
+      },
+      "freezePrototype": true,
+      "capabilities": [
+        "main",
+        "overlay"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "Khugjil",
+    "copyright": "Khugjil",
+    "category": "Business",
+    "shortDescription": "Орлогын мэдэгдэл",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "English"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://app.khugjil.usukh.shop/agent/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

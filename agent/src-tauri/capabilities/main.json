@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Cashier view: API calls through the allowlisted proxy, the live stream, the overlay and taskbar attention. No file system, shell, HTTP, opener, dialog or clipboard access.",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-api-request",
+    "allow-stream-start",
+    "allow-stream-stop",
+    "allow-overlay-show",
+    "allow-overlay-config",
+    "allow-overlay-clear",
+    "allow-attention"
+  ]
+}

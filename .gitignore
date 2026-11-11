@@ -27,3 +27,6 @@ e2e/playwright-report/
 .DS_Store
 .idea/
 .vscode/
+agent/node_modules/
+agent/src-tauri/target/
+agent/src-tauri/gen/

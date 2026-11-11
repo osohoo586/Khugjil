@@ -1,0 +1,49 @@
+[package]
+name = "khugjil-agent"
+version = "0.1.0"
+description = "Khugjil cashier desktop agent (Windows): cashier view + always-on-top income overlay"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+publish = false
+
+[lib]
+name = "khugjil_agent"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.5", features = ["tray-icon"] }
+tauri-plugin-single-instance = "=2.5.4"
+tauri-plugin-autostart = "=2.7.0"
+tauri-plugin-updater = "=2.14.0"
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "stream", "rustls"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+tokio = { version = "=1.54.1", features = ["sync", "time", "macros"] }
+futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+zeroize = { version = "=1.9.1", features = ["std"] }
+thiserror = "=2.0.21"
+webpki-root-certs = "=1.0.11"
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "=3.6.3", features = ["windows-native"] }
+windows-sys = { version = "=0.61.2", features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "=3.6.3", features = ["apple-native"] }
+
+[dev-dependencies]
+tokio = { version = "=1.54.1", features = ["rt", "macros"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

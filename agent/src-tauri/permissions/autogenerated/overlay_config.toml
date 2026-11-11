@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-overlay-config"
+description = "Enables the overlay_config command without any pre-configured scope."
+commands.allow = ["overlay_config"]
+
+[[permission]]
+identifier = "deny-overlay-config"
+description = "Denies the overlay_config command without any pre-configured scope."
+commands.deny = ["overlay_config"]
