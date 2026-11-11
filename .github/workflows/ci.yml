@@ -44,6 +44,25 @@ jobs:
       - run: make cashier-check
       - run: cd cf-worker && npm test
 
+  e2e:
+    # Screenshot tests (SPEC §8.5) against the committed *-linux.png baselines. They are rendered in
+    # the same image and on the same CPU architecture (arm64) that generated them (e2e/README.md).
+    runs-on: ubuntu-24.04-arm
+    container: mcr.microsoft.com/playwright:v1.65.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: cd server && uv sync --locked
+      - run: cd cashier && npm ci
+      - run: cd e2e && npm ci
+      - run: cd e2e && npm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results
+          path: e2e/test-results
+          retention-days: 7
+
   agent:
     # Phase 2 desktop agent (PLAN-PHASE2 §7). Built and tested on Windows; the installer is unsigned
     # and has no updater artifacts here (releases: agent-release.yml).
