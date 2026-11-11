@@ -16,6 +16,12 @@ STATE="$ROOT/.dev/public"
 mkdir -p "$STATE"
 chmod 700 "$STATE"
 
+# Optional overrides kept on this Mac (e.g. KHJ_PUBLIC_INBOUND_HOST when Cloudflare Email Routing
+# serves the zone apex instead of in.khugjil.usukh.shop).
+if [ -f "$STATE/site.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$STATE/site.sh"
+fi
 ADMIN_HOST="${KHJ_PUBLIC_ADMIN_HOST:-khugjil.usukh.shop}"
 APP_HOST="${KHJ_PUBLIC_APP_HOST:-khugjil-kass.usukh.shop}"
 IN_HOST="${KHJ_PUBLIC_INBOUND_HOST:-in.khugjil.usukh.shop}"
@@ -162,6 +168,7 @@ fi
 
 invite="$(grep '^owner_invite=' "$STATE/tenant.txt" | cut -d= -f2-)"
 inbound="$(grep '^inbound_address=' "$STATE/tenant.txt" | cut -d= -f2-)"
+inbound="${inbound%@*}@$IN_HOST"  # the secret local part never changes; the domain follows IN_HOST
 cat <<EOF
 
 Up (this Mac is the server while this runs and the Mac is awake).
