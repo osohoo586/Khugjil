@@ -1,11 +1,8 @@
-import { Api, ApiError, type DeviceInfo, type Txn } from "./api";
+import { type Api, ApiError, type DeviceInfo, type Txn } from "./api";
 import { Chime } from "./audio";
 import { h, replace } from "./dom";
 import { clock, parseAmountInput } from "./format";
-import { disablePush, enablePush } from "./push";
-import { LiveStream } from "./stream";
-import { TitleFlasher } from "./title";
-import { ToastStack } from "./ui/toast";
+import type { LiveConnection, Platform } from "./platform";
 import {
   HIGHLIGHT_MS,
   LIST_LIMIT,
@@ -29,32 +26,37 @@ export class CashierApp {
   private info: DeviceInfo | null = null;
   private items: Txn[] = [];
   private highlightUntil = 0;
-  private stream: LiveStream | null = null;
+  private stream: LiveConnection | null = null;
   private connected = true;
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastActivity = 0;
   private verifyTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly chime = new Chime();
-  private readonly title = new TitleFlasher("Орлого");
-  private readonly toasts: ToastStack;
+  private readonly api: Api;
   private voice: Voice | null = null;
   private refs: { status?: HTMLElement; clock?: HTMLElement; banner?: HTMLElement; sound?: HTMLElement; hero?: HTMLElement; list?: HTMLElement; footer?: HTMLElement } = {};
 
   constructor(
     private readonly root: HTMLElement,
-    toastRoot: HTMLElement,
-    private readonly api: Api = new Api(),
+    private readonly platform: Platform,
   ) {
-    this.toasts = new ToastStack(toastRoot, 8);
+    this.api = platform.api;
   }
 
   async start(path: string, hash: string): Promise<void> {
     const token = /(?:^|[#&])t=([A-Za-z0-9_-]{20,128})/.exec(hash)?.[1];
     if (hash) history.replaceState(null, "", path); // tokens never stay in the address bar
     if (path === "/pair") return this.showPair(token);
-    if (path === "/invite") return this.showInvite(token);
-    this.voice = await loadVoice();
+    if (path === "/invite" && this.platform.kind === "web") return this.showInvite(token);
+    this.voice ??= await loadVoice();
     await this.load();
+  }
+
+  private go(path: string): void {
+    this.stream?.close();
+    this.stream = null;
+    if (this.platform.navigate) this.platform.navigate(path);
+    else void this.start(path, "");
   }
 
   // ------------------------------------------------------------ loading + screens
@@ -64,14 +66,14 @@ export class CashierApp {
       this.info = await this.api.device();
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        window.location.assign("/pair");
+        this.go("/pair");
         return;
       }
       replace(this.root, message(e instanceof ApiError ? e.message : "Алдаа гарлаа.", "error"));
       return;
     }
     document.documentElement.dataset.accent = this.info.accent;
-    this.toasts.setSeconds(this.info.toast_seconds);
+    this.platform.notifier.setSeconds(this.info.toast_seconds);
     if (!this.info.shift) {
       this.stream?.close();
       this.stream = null;
@@ -99,7 +101,7 @@ export class CashierApp {
       replace(out, message(e instanceof ApiError ? e.message : "Алдаа гарлаа.", "error"));
       return;
     }
-    if (this.info) await enablePush(this.api, this.info.vapid_public_key).catch(() => false);
+    if (this.info) await this.platform.enableBackground(this.info).catch(() => undefined);
     await this.load();
   }
 
@@ -160,10 +162,10 @@ export class CashierApp {
   }
 
   private async endShift(): Promise<void> {
-    await disablePush(this.api);
+    await this.platform.disableBackground().catch(() => undefined);
     await this.api.endShift().catch(() => undefined);
-    this.toasts.clear();
-    this.title.stop();
+    this.platform.notifier.clear();
+    this.platform.attention.stop();
     await this.load();
   }
 
@@ -171,13 +173,17 @@ export class CashierApp {
 
   private connect(): void {
     this.stream?.close();
-    this.stream = new LiveStream({
+    this.stream = this.platform.live({
       onTxn: (t) => this.receive(t, true),
       onTest: (t) => this.receiveTest(t),
-      onShiftEnded: () => void this.load(),
+      onShiftEnded: () => {
+        this.platform.notifier.clear();
+        void this.load();
+      },
       onRevoked: () => {
-        this.toasts.clear();
-        replace(this.root, revokedScreen());
+        this.platform.notifier.clear();
+        this.platform.attention.stop();
+        replace(this.root, revokedScreen(() => this.go("/pair")));
       },
       onSettings: () => void this.load(),
       onStatus: (ok) => this.setConnected(ok),
@@ -227,8 +233,8 @@ export class CashierApp {
     void this.api.ack(t.id).catch(() => undefined);
     void this.refreshTotals();
     if (!announce || !this.info) return;
-    this.toasts.push(t, this.info.multiple_accounts);
-    this.title.notify(`Орлого ${t.amount_text}`);
+    this.platform.notifier.show(t, this.info.multiple_accounts);
+    this.platform.attention.notify(`Орлого ${t.amount_text}`);
     void this.announce(t);
   }
 
@@ -241,7 +247,7 @@ export class CashierApp {
   }
 
   private receiveTest(t: Partial<Txn>): void {
-    this.toasts.push({ ...t, test: true, time_text: clock(new Date()) }, false);
+    this.platform.notifier.show({ ...t, test: true, time_text: clock(new Date()) }, false);
     this.chime.play();
   }
 
@@ -285,11 +291,11 @@ export class CashierApp {
     const submit = async (input: { token?: string; code?: string }, out: HTMLElement | null) => {
       try {
         await this.api.pair(input);
-        window.location.assign("/");
+        this.go("/");
       } catch (e) {
         const text = e instanceof ApiError ? e.message : "Алдаа гарлаа.";
         if (out) replace(out, message(text, "error"));
-        else replace(this.root, pairScreen((code, o) => void submit({ code }, o)), message(text, "error"));
+        else replace(this.root, pairScreen(this.platform.kind, (code, o) => void submit({ code }, o)), message(text, "error"));
       }
     };
     if (token) {
@@ -297,7 +303,7 @@ export class CashierApp {
       void submit({ token }, null);
       return;
     }
-    replace(this.root, pairScreen((code, out) => void submit({ code }, out)));
+    replace(this.root, pairScreen(this.platform.kind, (code, out) => void submit({ code }, out)));
   }
 
   private async showInvite(token: string | undefined): Promise<void> {

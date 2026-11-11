@@ -1,5 +1,8 @@
 import { Api, type DeviceInfo, type Txn } from "./api";
 import { CashierApp } from "./app";
+import type { Platform } from "./platform";
+import { webPlatform } from "./platform-web";
+import type { StreamHandlers } from "./stream";
 import { txn } from "./dom.test";
 
 const info: DeviceInfo = {
@@ -38,7 +41,7 @@ describe("CashierApp", () => {
     const root = document.createElement("div");
     const toasts = document.createElement("div");
     const api = fakeApi({ "/api/v1/device": info, "/api/v1/transactions": { items: [txn()] } });
-    const app = new CashierApp(root, toasts, api);
+    const app = new CashierApp(root, webPlatform(toasts, api));
     await app.start("/", "");
     expect(document.documentElement.dataset.accent).toBe("navy");
     expect(root.querySelector(".hero-amount")?.textContent).toBe("2,800 ₮");
@@ -54,7 +57,7 @@ describe("CashierApp", () => {
   it("shows the shift-start screen when no shift is open", async () => {
     const root = document.createElement("div");
     const api = fakeApi({ "/api/v1/device": { ...info, shift: null } });
-    await new CashierApp(root, document.createElement("div"), api).start("/", "");
+    await new CashierApp(root, webPlatform(document.createElement("div"), api)).start("/", "");
     expect(root.textContent).toContain("Ээлж эхлүүлэх");
     expect(root.querySelector("select option")?.textContent).toBe("Б. Сараа");
   });
@@ -63,9 +66,39 @@ describe("CashierApp", () => {
     const replaceState = vi.spyOn(history, "replaceState");
     const api = fakeApi({ "/api/v1/pair": { paired: true } });
     const root = document.createElement("div");
-    await new CashierApp(root, document.createElement("div"), api).start("/pair", "#t=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    await new CashierApp(root, webPlatform(document.createElement("div"), api)).start("/pair", "#t=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(replaceState).toHaveBeenCalledWith(null, "", "/pair");
     await new Promise((r) => setTimeout(r, 0));
     expect((api as unknown as { calls: string[] }).calls).toContain("POST /api/v1/pair");
+  });
+
+  it("runs on an injected platform without page navigation (agent style)", async () => {
+    const shown: string[] = [];
+    const flashed: string[] = [];
+    let handlers: StreamHandlers | undefined;
+    const api = fakeApi({ "/api/v1/device": info, "/api/v1/transactions": { items: [] } });
+    const platform: Platform = {
+      kind: "agent",
+      api,
+      notifier: { show: (t) => shown.push(t.amount_text ?? ""), setSeconds: () => undefined, clear: () => shown.push("clear") },
+      attention: { notify: (text) => flashed.push(text), stop: () => undefined },
+      live: (h) => {
+        handlers = h;
+        return { connect: () => undefined, close: () => undefined };
+      },
+      enableBackground: async () => undefined,
+      disableBackground: async () => undefined,
+    };
+    const root = document.createElement("div");
+    await new CashierApp(root, platform).start("/", "");
+    handlers?.onTxn(txn({ id: "t9", seq: 9, amount_text: "9,000 ₮" }));
+    expect(shown).toEqual(["9,000 ₮"]);
+    expect(flashed).toEqual(["Орлого 9,000 ₮"]);
+    handlers?.onRevoked();
+    expect(shown).toEqual(["9,000 ₮", "clear"]);
+    expect(root.textContent).toContain("цуцлагдсан");
+    root.querySelector<HTMLButtonElement>("button")?.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.querySelector("h1")?.textContent).toBe("Энэ компьютерийг холбох");
   });
 });

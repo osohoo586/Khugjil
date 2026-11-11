@@ -144,7 +144,18 @@ export function shiftStart(
   );
 }
 
-export function pairScreen(onSubmit: (code: string, out: HTMLElement) => void): HTMLElement {
+const PAIR_COPY = {
+  web: {
+    title: "Төхөөрөмж холбох",
+    hint: "Админ хэсгийн «Төхөөрөмжүүд» хуудаснаас авсан 12 тэмдэгттэй кодыг оруулна уу. Код 10 минутын дотор нэг удаа ажиллана.",
+  },
+  agent: {
+    title: "Энэ компьютерийг холбох",
+    hint: "Админ хэсгийн «Төхөөрөмжүүд» хуудаснаас «Агент» төрлийн код үүсгээд энд оруулна уу. Код 10 минутын дотор нэг удаа ажиллана.",
+  },
+} as const;
+
+export function pairScreen(kind: "web" | "agent", onSubmit: (code: string, out: HTMLElement) => void): HTMLElement {
   const out = h("div", { class: "form-error", "aria-live": "assertive" });
   const input = h("input", { id: "code", autocomplete: "off", autocapitalize: "characters", placeholder: "XXXX-XXXX-XXXX", maxlength: 20, required: true });
   const form = h(
@@ -162,8 +173,8 @@ export function pairScreen(onSubmit: (code: string, out: HTMLElement) => void): 
   return h(
     "section",
     { class: "card narrow" },
-    h("h1", {}, "Төхөөрөмж холбох"),
-    h("p", {}, "Админ хэсгийн «Төхөөрөмжүүд» хуудаснаас авсан 12 тэмдэгттэй кодыг оруулна уу. Код 10 минутын дотор нэг удаа ажиллана."),
+    h("h1", {}, PAIR_COPY[kind].title),
+    h("p", {}, PAIR_COPY[kind].hint),
     form,
   );
 }
@@ -197,12 +208,12 @@ export function inviteScreen(
   return h("section", { class: "card narrow" }, h("h1", {}, `${tenant} — ${name}`), form);
 }
 
-export function revokedScreen(): HTMLElement {
+export function revokedScreen(onPair: () => void): HTMLElement {
   return h(
     "section",
     { class: "card narrow" },
     h("h1", {}, "Төхөөрөмжийн эрх цуцлагдсан"),
     h("p", {}, "Энэ төхөөрөмжийг админ цуцалсан байна. Дахин ашиглахын тулд админаас шинэ холбох код авна уу."),
-    h("a", { href: "/pair", class: "btn btn-primary" }, "Холбох хуудас руу"),
+    h("button", { type: "button", class: "btn btn-primary", onclick: onPair }, "Холбох хуудас руу"),
   );
 }
