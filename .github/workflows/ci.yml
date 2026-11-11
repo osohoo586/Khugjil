@@ -42,3 +42,34 @@ jobs:
           node-version: "22"
       - run: cd cashier && npm ci
       - run: make cashier-check
+
+  agent:
+    # Phase 2 desktop agent (PLAN-PHASE2 §7). Built and tested on Windows; the installer is unsigned
+    # and has no updater artifacts here (releases: agent-release.yml).
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: rustup toolchain install stable --profile minimal -c clippy -c rustfmt && rustup default stable
+      - run: node agent/scripts/check-capabilities.mjs
+      - run: cd cashier && npm ci && npm run build:agent
+      - run: cd agent && npm ci
+      - run: cd agent/src-tauri && cargo fmt --check
+      - run: cd agent/src-tauri && cargo clippy --locked --all-targets -- -D warnings
+      - run: cd agent/src-tauri && cargo test --locked
+      - run: cd agent && npx tauri build --ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: khugjil-agent-unsigned
+          path: agent/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 7
+
+  agent-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install --locked cargo-audit
+      - run: cd agent/src-tauri && cargo audit --deny warnings
+      - run: cd agent && npm ci && npm audit --audit-level=moderate

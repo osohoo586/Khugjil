@@ -1,0 +1,11 @@
+# These advisories affect only Linux-only dependencies of Tauri (GTK and D-Bus). The agent is built
+# and shipped for Windows only: `cargo tree -i <crate> --target x86_64-pc-windows-msvc` prints
+# nothing for each of them. Re-check this list whenever Tauri is upgraded.
+[advisories]
+ignore = [
+  "RUSTSEC-2024-0370", # proc-macro-error unmaintained (glib-macros -> GTK tray on Linux)
+  "RUSTSEC-2024-0429", # glib VariantStrIter unsound (GTK, Linux)
+  "RUSTSEC-2026-0370", # zvariant unmaintained (zbus, single-instance on Linux)
+  "RUSTSEC-2026-0371", # zbus_names unmaintained (same)
+  "RUSTSEC-2026-0372", # zvariant_derive unmaintained (same)
+]

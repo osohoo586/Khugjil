@@ -1,0 +1,47 @@
+name: agent-release
+
+# Builds a signed-update release of the desktop agent when a tag like `agent-v0.1.0` is pushed.
+# Needs (added by the owner, never committed):
+#   secrets.TAURI_SIGNING_PRIVATE_KEY, secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+# and the matching public key committed in agent/src-tauri/tauri.conf.json (plugins.updater.pubkey).
+# The output (installer, .sig, latest.json) is a workflow artifact; copy it to the server's
+# deploy/agent-releases/ directory, which Caddy serves at https://app.<DOMAIN>/agent/.
+on:
+  push:
+    tags: ["agent-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Tag matches the app version and the updater key is set
+        shell: bash
+        run: |
+          version=$(node -p "require('./agent/src-tauri/tauri.conf.json').version")
+          test "agent-v$version" = "$GITHUB_REF_NAME"
+          node -e "const c=require('./agent/src-tauri/tauri.conf.json'); if(!c.plugins.updater.pubkey) process.exit(1)"
+      - run: node agent/scripts/check-capabilities.mjs
+      - run: cd agent && npm ci
+      - name: Build (installer + signed update)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: cd agent && npx tauri build --ci --config "{\"bundle\":{\"createUpdaterArtifacts\":true}}"
+      - name: latest.json
+        shell: bash
+        run: node agent/scripts/latest-json.mjs agent/src-tauri/target/release/bundle/nsis > agent/src-tauri/target/release/bundle/nsis/latest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: khugjil-agent-${{ github.ref_name }}
+          path: |
+            agent/src-tauri/target/release/bundle/nsis/*-setup.exe
+            agent/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            agent/src-tauri/target/release/bundle/nsis/latest.json

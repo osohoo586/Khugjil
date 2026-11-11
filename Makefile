@@ -1,4 +1,4 @@
-.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets
+.PHONY: services services-down lint typecheck security test coverage check cashier-check e2e sync-assets agent-check
 
 COMPOSE_TEST = docker compose -f deploy/docker-compose.test.yml
 
@@ -28,6 +28,11 @@ cashier-check:
 
 e2e:
 	cd e2e && npm test
+
+agent-check:          ## desktop agent: capability guard, rustfmt, clippy, Rust tests (Phase 2)
+	node agent/scripts/check-capabilities.mjs
+	cd cashier && npm run build:agent
+	cd agent/src-tauri && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked
 
 sync-assets:          ## copy shared design tokens + fonts into the admin static folder
 	mkdir -p server/src/khugjil/admin/static/shared/fonts

@@ -36,6 +36,15 @@ app.{$KHJ_DOMAIN} {
 	import security
 	encode zstd gzip
 
+	# Desktop agent installer and signed updates (PLAN-PHASE2 §2.8). The manifest is public; its
+	# integrity comes from the minisign signature checked by the agent, not from this host.
+	handle_path /agent/* {
+		root * /srv/agent
+		header Cache-Control "no-cache"
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		file_server
+	}
+
 	@backend path /api/* /hooks/*
 	handle @backend {
 		reverse_proxy api:8000 {

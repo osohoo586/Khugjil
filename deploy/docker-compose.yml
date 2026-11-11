@@ -27,7 +27,7 @@ services:
     environment:
       KHJ_DOMAIN: ${KHJ_DOMAIN:?set KHJ_DOMAIN in the env file}
     ports: ["443:443"]
-    volumes: [caddy_data:/data, caddy_config:/config]
+    volumes: [caddy_data:/data, caddy_config:/config, ./agent-releases:/srv/agent:ro]
     read_only: true
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]

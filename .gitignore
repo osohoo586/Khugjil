@@ -30,3 +30,5 @@ e2e/playwright-report/
 agent/node_modules/
 agent/src-tauri/target/
 agent/src-tauri/gen/
+deploy/agent-releases/*
+!deploy/agent-releases/README.md
