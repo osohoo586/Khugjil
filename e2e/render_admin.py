@@ -81,10 +81,11 @@ def pages() -> dict[str, tuple[str, dict[str, Any]]]:
             "device_groups": {uid(10): ["Төв дэлгүүр"], uid(11): ["Салбар-2"], uid(12): ["Төв дэлгүүр", "Салбар-2"]},
             "groups": groups, "on_shift": {uid(10): "Б. Сараа"},
             "online": {uid(10): True, uid(11): False, uid(12): True},
+            "agent_enabled": False,
         }),
         "pair": ("pair.html", {
             "pairing": pairing, "url": "https://app.example.mn/pair#t=" + "x" * 43,
-            "device_name": "Касс-3", "app_host": "app.example.mn",
+            "device_name": "Касс-3", "app_host": "app.example.mn", "kind": "web",
         }),
         "email": ("email.html", {
             "notice": None, "address": "k7q2m4x9d3ta6vwe5hb2nrfy@in.example.mn",
