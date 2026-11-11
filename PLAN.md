@@ -803,6 +803,7 @@ All of this is done in small commits. Q1–Q3 only block **going live**, not cod
 - **Q5.** Transaction retention (for example 90 days). Are these also OK: `ingest_event` 30 days, audit log 1 year?
 - **Q6.** Transfers from other banks: does an incoming transfer from another bank use a different layout? Which lines or labels differ? Describe with fake values.
 - **Q7.** The domain name, and is it OK to use the `app.`, `admin.` and `in.` subdomains?
+  - **Answered (2026-11-11):** `khugjil.usukh.shop`, so the hosts are `app.khugjil.usukh.shop`, `admin.khugjil.usukh.shop` and `in.khugjil.usukh.shop`. The `usukh.shop` zone is on Cloudflare DNS, so the Email Routing fallback (Q4) is available if inbound port 25 is blocked.
 
 **B. Email structure (describe it, don't paste it)**
 

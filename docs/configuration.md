@@ -7,7 +7,7 @@ that file. Generate key material locally with `cd server && uv run khugjil keys 
 | Variable | Required | Notes |
 |---|---|---|
 | `KHJ_ENV` | no | `production` (default), `development` or `test` |
-| `KHJ_DOMAIN` | yes | Base domain; `app.`, `admin.` and `in.` subdomains are derived from it |
+| `KHJ_DOMAIN` | yes | Base domain, `khugjil.usukh.shop` (PLAN Q7); `app.`, `admin.` and `in.` subdomains are derived from it |
 | `KHJ_MASTER_KEY` | yes | Base64 of exactly 32 random bytes; all field-encryption and HMAC keys derive from it |
 | `KHJ_DATABASE_URL` | yes | `postgresql+psycopg://khugjil_app:…@postgres:5432/khugjil` (non-owner role) |
 | `KHJ_REDIS_URL` | yes | `redis://redis:6379/0` |

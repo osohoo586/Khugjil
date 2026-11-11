@@ -36,16 +36,25 @@ fonts, format test vectors), `deploy/` (Compose, Caddy, firewall, fail2ban, back
 
 ### 1. DNS
 
-Replace `example.mn` with your domain (PLAN Q7). All records point at the server's public IP.
+The base domain is `khugjil.usukh.shop` (PLAN Q7), so set `KHJ_DOMAIN=khugjil.usukh.shop`. The
+`usukh.shop` zone is on Cloudflare DNS; add these records there. All A records point at the
+server's public IP.
 
 | Name | Type | Value |
 |---|---|---|
-| `app.example.mn` | A | server IP (cashier PWA) |
-| `admin.example.mn` | A | server IP (admin panel) |
-| `in.example.mn` | A | server IP (SMTP) |
-| `in.example.mn` | MX | `10 in.example.mn.` |
-| `in.example.mn` | TXT (SPF) | `v=spf1 -all` (this host never sends mail) |
-| `_dmarc.in.example.mn` | TXT | `v=DMARC1; p=reject` |
+| `app.khugjil.usukh.shop` | A | server IP (cashier PWA) |
+| `admin.khugjil.usukh.shop` | A | server IP (admin panel) |
+| `in.khugjil.usukh.shop` | A | server IP (SMTP) |
+| `in.khugjil.usukh.shop` | MX | `10 in.khugjil.usukh.shop.` |
+| `in.khugjil.usukh.shop` | TXT (SPF) | `v=spf1 -all` (this host never sends mail) |
+| `_dmarc.in.khugjil.usukh.shop` | TXT | `v=DMARC1; p=reject` |
+
+Set every record to **DNS only** (grey cloud), not Proxied:
+
+- Caddy obtains its own certificates with TLS-ALPN-01, which needs a direct connection on 443.
+- Cloudflare's free certificate covers only one level below `usukh.shop`, not `app.khugjil.usukh.shop`.
+- SMTP can't be proxied at all.
+- Proxying would also let a third party terminate TLS for the admin panel and the cashier API.
 
 Inbound TCP port 25 must be reachable (PLAN Q4). If your provider blocks it, use the Cloudflare
 Email Routing fallback (`/hooks/cf`, signed requests; set `KHJ_CF_INGEST_SECRET`).
@@ -59,7 +68,7 @@ Email Routing fallback (`/hooks/cf`, signed requests; set `KHJ_CF_INGEST_SECRET`
    variables from `docs/configuration.md`, plus `KHJ_POSTGRES_SUPERUSER_PASSWORD` and
    `KHJ_REDIS_PASSWORD`. Set `KHJ_MIGRATION_DATABASE_URL` to the `khugjil_owner` role and
    `KHJ_DATABASE_URL` to the `khugjil_app` role. Set
-   `KHJ_SMTP_TLS_CERT=/certs/caddy/certificates/acme-v02.api.letsencrypt.org-directory/in.example.mn/in.example.mn.crt`
+   `KHJ_SMTP_TLS_CERT=/certs/caddy/certificates/acme-v02.api.letsencrypt.org-directory/in.khugjil.usukh.shop/in.khugjil.usukh.shop.crt`
    and the matching `.key`.
 3. Start the database and create the roles (passwords as psql variables, never in files):
    ```sh
@@ -107,7 +116,7 @@ outcome records after 30 days.
 ## Кассын компьютер тохируулах заавар
 
 1. Админ хэсгийн **Төхөөрөмжүүд** хуудаснаас **Код үүсгэх** дарна.
-2. Кассын компьютерийн Chrome эсвэл Edge хөтчөөр `https://app.<таны домэйн>/pair` хаягийг нээж,
+2. Кассын компьютерийн Chrome эсвэл Edge хөтчөөр `https://app.khugjil.usukh.shop/pair` хаягийг нээж,
    12 тэмдэгттэй кодыг оруулна (утсанд бол QR кодыг уншуулна). Код 10 минутын дотор нэг удаа ажиллана.
 3. Кассчин нэрээ сонгож, ПИН кодоо оруулаад **Ээлж эхлүүлэх** дарна. Энэ товчийг дарснаар дуут
    дохио идэвхжиж, хөтөч мэдэгдэл харуулах зөвшөөрөл асууна — **Зөвшөөрөх** гэж сонгоно уу.

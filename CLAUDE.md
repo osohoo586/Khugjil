@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-`SPEC.md` is the authoritative spec for a multi-tenant **Khan Bank income notifier**; `PLAN.md` is the approved design (architecture, data model, threat model, open questions Q1–Q36). Phase 1 is implemented on the `phase1` branch; Phase 2 (desktop agent) has not been approved. The Khan Bank placeholders (Q1–Q3) and the real email layout (Q6, Q8, Q9, Q11) are still unknown: everything is built and tested against fake values. This file summarizes the parts that are easiest to get wrong; when they disagree, `SPEC.md` wins.
+`SPEC.md` is the authoritative spec for a multi-tenant **Khan Bank income notifier**; `PLAN.md` is the approved design (architecture, data model, threat model, open questions Q1–Q36). Phase 1 is implemented on the `phase1` branch; Phase 2 (desktop agent) has not been approved. The production domain is `khugjil.usukh.shop` (Q7; `app.`/`admin.`/`in.` subdomains, Cloudflare DNS with records set to DNS only). The Khan Bank placeholders (Q1–Q3) and the real email layout (Q6, Q8, Q9, Q11) are still unknown: everything is built and tested against fake values. This file summarizes the parts that are easiest to get wrong; when they disagree, `SPEC.md` wins.
 
 ## Commands
 
