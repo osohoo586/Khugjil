@@ -22,11 +22,17 @@ from zoneinfo import ZoneInfo
 from khugjil.crypto import sha256_hex
 from khugjil.ingest import mime
 from khugjil.ingest.denylist import contains_denied
-from khugjil.ingest.dkim_arc import DnsFunc, authenticate, bank_signature_id
+from khugjil.ingest.dkim_arc import (
+    DnsFunc,
+    authenticate,
+    bank_signature_id,
+    signature_domains,
+)
 from khugjil.ingest.forwarding import confirmation_code, sender_address
 from khugjil.ingest.parsers import golomt_v1, khan_v1
 from khugjil.ingest.reasons import Reason
 from khugjil.ingest.sanitize import clean_text, sanitize_description
+from khugjil.logs import get_logger
 from khugjil.sensitive import Sensitive
 from khugjil.settings import BANK_TZ, Settings
 
@@ -232,6 +238,11 @@ def evaluate(
 
     # c: DKIM for the bank domain, or Gmail ARC recording a bank DKIM pass.
     if not authenticate(raw, bank.dkim_domains, dnsfunc):
+        # From an allowed bank sender: record only which domains signed it (no content), so the
+        # bank's real DKIM domain can be configured from its first email.
+        get_logger().info(
+            "ingest.auth_domains", dkim_domains=",".join(signature_domains(raw)) or "-"
+        )
         return drop(Reason.AUTH_FAIL)
 
     # d: text-only MIME, size limits.

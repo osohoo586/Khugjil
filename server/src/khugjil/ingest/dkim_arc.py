@@ -93,6 +93,26 @@ def arc_pass(raw: bytes, domains: Iterable[str], dnsfunc: DnsFunc) -> bool:
     return _aar_records_pass(text, {d.lower() for d in domains})
 
 
+def signature_domains(raw: bytes, limit: int = 5) -> list[str]:
+    """The ``d=`` domains of the message's DKIM signatures (no verification, no content): lets a
+    new bank's signing domain be found from its first email instead of guessed."""
+    try:
+        verifier = dkim.DKIM(raw, minkey=1024)
+    except Exception:
+        return []
+    out: list[str] = []
+    for k, value in verifier.headers:
+        if k.lower() != b"dkim-signature" or len(out) >= limit:
+            continue
+        try:
+            d = parse_tag_value(value).get(b"d", b"").strip().lower().decode("ascii")
+        except (InvalidTagValueList, UnicodeDecodeError):
+            continue
+        if re.fullmatch(r"[a-z0-9.-]{1,253}", d):
+            out.append(d)
+    return out
+
+
 def bank_signature_id(raw: bytes, domains: Iterable[str]) -> str | None:
     """A stable id for "this exact bank-signed message": SHA-256 of the bank signature's ``b=``.
 

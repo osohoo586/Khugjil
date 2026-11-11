@@ -117,3 +117,22 @@ def test_bank_signature_id(mailer: Mailer) -> None:
     broken = b"DKIM-Signature: v=1; this is not a tag list\r\n" + build_golomt_message()
     assert bank_signature_id(broken, ["bank.example"]) is None
     assert bank_signature_id(b"\x00", ["bank.example"]) is None
+
+
+def test_failed_bank_email_logs_only_its_signing_domains(mailer: Mailer, log_capture: Any) -> None:
+    """A new bank's DKIM domain is found from its first email: only d= values are logged."""
+    import json
+
+    raw = mailer.dkim_sign(
+        build_golomt_message(FakeGolomt(description="MARKER")),
+        domain="attacker.example",
+        selector="x1",
+        key="attacker",
+    )
+    assert str(evaluate(raw, mailer).reason) == "AUTH_FAIL"
+    out = log_capture.getvalue()
+    assert "MARKER" not in out
+    lines = [json.loads(x) for x in out.splitlines() if "ingest.auth_domains" in x]
+    assert [x["dkim_domains"] for x in lines] == ["attacker.example"]
+    assert evaluate(build_golomt_message(), mailer).reason.value == "AUTH_FAIL"
+    assert '"dkim_domains": "-"' in log_capture.getvalue()

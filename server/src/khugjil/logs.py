@@ -49,6 +49,8 @@ ALLOWED_KEYS: frozenset[str] = frozenset(
         # lengths only (never text), to adapt the recogniser (ingest/forwarding.py).
         "fwd_shape",
         "fwd_digits",
+        # DKIM d= domains of an allowed bank sender's email that failed check c (no content).
+        "dkim_domains",
     }
 )
 _EVENT_RE = re.compile(r"^[a-z][a-z0-9_.]{0,63}$")
