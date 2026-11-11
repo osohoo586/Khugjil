@@ -97,8 +97,18 @@ async def add_bank_account(
     return account.id
 
 
+def masked_label(number: str) -> str:
+    """How to show a number the bank printed masked: "160*****04" -> "160…04"; a full number
+    keeps the usual "••1234"."""
+    if "*" not in number:
+        return f"••{number[-4:]}"
+    head, tail = number[: number.index("*")], number[number.rindex("*") + 1 :]
+    return f"{head}…{tail}"
+
+
 def account_suffix(crypto: Crypto, account: BankAccount) -> str:
+    """The digits shown after "••": the last 4 of a full number, or what follows the mask."""
     number = crypto.decrypt_str(
         account.number_enc, field_aad(account.tenant_id, "bank_account", "number_enc")
     )
-    return number[-4:]
+    return number[number.rindex("*") + 1 :] if "*" in number else number[-4:]

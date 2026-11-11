@@ -71,6 +71,13 @@ AccountLookup = Callable[[str], AccountMatch | None]
 MIN_VISIBLE_DIGITS = 4
 
 
+def numbers_overlap(a: str, b: str) -> bool:
+    """Could these two (possibly masked) numbers be the same account?"""
+    return len(a) == len(b) and all(
+        x == y for x, y in zip(a, b, strict=True) if x != "*" and y != "*"
+    )
+
+
 def masked_match(masked: str, accounts: dict[str, AccountMatch]) -> AccountMatch | None:
     """Match a masked number ("123*****89") against the shop's full numbers: same length, equal
     at every visible digit. Exactly one candidate, or None (unknown or ambiguous)."""
@@ -311,3 +318,17 @@ def evaluate(
         description=sanitize_description(parsed.description_raw),
         parser_version=parsed.parser_version,
     )
+
+
+def credited_account(raw: bytes, bank: BankConfig) -> Sensitive | None:
+    """The credited account as the bank printed it (possibly masked). Only for the pipeline, after
+    ``evaluate`` returned NOT_TENANT_ACCOUNT (so checks b-e passed), and only for a tenant that
+    opted into auto_add_accounts. Never logged or shown."""
+    try:
+        msg = mime.parse_message(raw)
+        bodies = mime.inspect_bodies(msg, len(raw))
+        if isinstance(bodies, Reason):
+            return None
+        return PARSERS[bank.parser](mime.body_rows(bodies), msg).to_account
+    except (NotIncomeError, *TEMPLATE_ERRORS):
+        return None

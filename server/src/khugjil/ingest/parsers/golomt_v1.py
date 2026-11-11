@@ -18,9 +18,11 @@ Differences from ``khan_v1`` that the checks account for:
   comparison is possible). The date has no time of day.
 - The balance row ends the description and is never read; payer data is never present.
 
-Rows are matched in a fixed order; a label's value may sit in the same cell, the next cell or the
-next row (HTML tables and plain text normalize differently). The description is captured LAST,
-strictly between its label and the balance row.
+The labelled fields are matched in a fixed order on the normalized text, wherever the
+HTML puts its line breaks: in the real email (2026-11-11, seen as structure only) the account,
+description and balance share one row, while the plain-text form puts each on its own line.
+The description is captured LAST, strictly between its label and the final balance label, so
+label-like text inside it cannot move any other field.
 """
 
 from __future__ import annotations
@@ -36,14 +38,15 @@ MAX_PREAMBLE_ROWS = 10
 
 _INCOME = "орлогын гүйлгээ"
 _EXPENSE = "зарлагын гүйлгээ"
-_AMOUNT_LABEL = re.compile(r"Гүйлгээний дүн:\s*(.*)")
-_AMOUNT = re.compile(r"\+\s?(\d{1,3}(?:,\d{3})*\.\d{2})\s?([A-Z]{3})")
-_DATE_LABEL = re.compile(r"Гүйлгээний огноо:\s*(.*)")
-_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?")
-_ACCOUNT_LABEL = re.compile(r"Дансны дугаар:\s*(.*)")
-_ACCOUNT = re.compile(r"[0-9*]{6,34}")
-_DESC_LABEL = re.compile(r"Гүйлгээний утга:\s?(.*)")
-_TERMINATOR = re.compile(r"Үлдэгдэл:.*")
+_TEMPLATE = re.compile(
+    r"ОРЛОГЫН ГҮЙЛГЭЭ\s+"
+    r"Гүйлгээний дүн:\s*\+\s?(?P<amount>\d{1,3}(?:,\d{3})*\.\d{2})\s?(?P<currency>[A-Z]{3})\s+"
+    r"Гүйлгээний огноо:\s*(?P<date>\d{4}-\d{2}-\d{2})(?:[ T](?P<time>\d{2}:\d{2}(?::\d{2})?))?\s+"
+    r"Дансны дугаар:\s*(?P<account>[0-9*]{6,34})\s+"
+    r"Гүйлгээний утга:(?P<desc>.*)"
+    r"Үлдэгдэл:[^\n]*(?:\n|$)",
+    re.DOTALL,
+)
 
 
 class TemplateMismatchError(Exception):
@@ -69,75 +72,27 @@ def _text(row: list[str]) -> str:
     return " ".join(row).strip()
 
 
-class _Cursor:
-    def __init__(self, rows: list[list[str]], start: int) -> None:
-        self.rows = rows
-        self.i = start
-
-    def take(self) -> list[str]:
-        if self.i >= len(self.rows):
-            raise TemplateMismatchError("unexpected end")
-        row = self.rows[self.i]
-        self.i += 1
-        return row
-
-    def labeled(self, label: re.Pattern[str], value: re.Pattern[str]) -> re.Match[str]:
-        """``Label: value`` in one row, or the label alone with the value in the next row."""
-        m = label.fullmatch(_text(self.take()))
-        if m is None:
-            raise TemplateMismatchError("label not found")
-        raw = m.group(1).strip() or _text(self.take())
-        v = value.fullmatch(raw)
-        if v is None:
-            raise TemplateMismatchError("bad value")
-        return v
-
-
 def parse(rows: list[list[str]]) -> ParsedGolomt:
-    start = None
-    for i, row in enumerate(rows[: MAX_PREAMBLE_ROWS + 1]):
-        kind = _text(row).casefold()
-        if kind == _EXPENSE:
-            raise NotIncomeError
-        if kind == _INCOME:
-            start = i
-            break
-    if start is None:
+    head = [_text(r).casefold() for r in rows[: MAX_PREAMBLE_ROWS + 1]]
+    if _EXPENSE in head:
+        raise NotIncomeError
+    if _INCOME not in head:
         raise TemplateMismatchError("header row not found")
-    cur = _Cursor(rows, start + 1)
-
-    amount_m = cur.labeled(_AMOUNT_LABEL, _AMOUNT)
-    amount = Decimal(amount_m.group(1).replace(",", ""))
-    currency = amount_m.group(2)
-    date_m = cur.labeled(_DATE_LABEL, _DATE)
-    account_m = cur.labeled(_ACCOUNT_LABEL, _ACCOUNT)
-    if sum(c.isdigit() for c in account_m.group(0)) < 4:
+    text = "\n".join(_text(r) for r in rows)
+    limit = sum(len(_text(r)) + 1 for r in rows[: head.index(_INCOME)])
+    m = _TEMPLATE.search(text)
+    if m is None or m.start() != limit:
+        raise TemplateMismatchError("fields not in the expected order")
+    account = m.group("account")
+    if sum(c.isdigit() for c in account) < 4:
         raise TemplateMismatchError("too few visible account digits")
-
-    label_row = cur.take()
-    inline_m = _DESC_LABEL.fullmatch(_text(label_row))
-    if inline_m is None:
-        raise TemplateMismatchError("description label")
-    inline = inline_m.group(1).strip()
-    template_end = cur.i
-    desc_parts = [inline] if inline else []
-    while True:
-        if cur.i >= len(rows):
-            raise TemplateMismatchError("balance row not found")
-        if _TERMINATOR.fullmatch(_text(rows[cur.i])):
-            break
-        desc_parts.append(_text(cur.take()))
-    desc_end = cur.i
-
-    outside = rows[:template_end] + rows[desc_end:]
-    if inline:
-        outside[template_end - 1] = ["Гүйлгээний утга:"]
+    desc_start, desc_end = m.span("desc")
     return ParsedGolomt(
-        account_masked=Sensitive(account_m.group(0)),
-        amount=amount,
-        currency=currency,
-        date=date_m.group(1),
-        time=date_m.group(2),
-        description_raw=" ".join(desc_parts),
-        non_description_text="\n".join(_text(r) for r in outside),
+        account_masked=Sensitive(account),
+        amount=Decimal(m.group("amount").replace(",", "")),
+        currency=m.group("currency"),
+        date=m.group("date"),
+        time=m.group("time"),
+        description_raw=" ".join(m.group("desc").split()),
+        non_description_text=text[:desc_start] + "\n" + text[desc_end:],
     )

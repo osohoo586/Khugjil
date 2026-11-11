@@ -9,22 +9,28 @@ recorded as ``ingest_event(tenant_id, reason_code, sha256(Message-ID))`` plus, w
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from email.utils import parseaddr
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from khugjil.crypto import Crypto, Purpose, field_aad
 from khugjil.db.models import (
     Alert,
+    AuditLog,
     BankAccount,
     ForwardingConfirmation,
+    GroupAccount,
     IngestEvent,
+    RecipientGroup,
     Tenant,
     Transaction,
 )
@@ -36,13 +42,16 @@ from khugjil.ingest.checks import (
     Dropped,
     Evaluation,
     ForwardingCode,
+    credited_account,
     evaluate,
     masked_match,
+    numbers_overlap,
 )
 from khugjil.ingest.dkim_arc import DnsFunc
+from khugjil.ingest.parsers.khan_v1 import canonical_account
 from khugjil.ingest.reasons import TEMPLATE_CHANGE_REASONS, Reason
 from khugjil.logs import get_logger
-from khugjil.services.provisioning import inbound_hmac
+from khugjil.services.provisioning import account_hmac, inbound_hmac, masked_label
 from khugjil.settings import Settings
 
 FORWARDING_CODE_TTL = timedelta(hours=24)
@@ -101,18 +110,64 @@ async def ingest(deps: IngestDeps, rcpt: str, raw: bytes, transport: str = "smtp
 
     async with tenant_session(deps.sessionmaker, tenant_id) as s:
         tenant = await s.get(Tenant, tenant_id)
-        rows = (
-            await s.execute(
-                select(
-                    BankAccount.id,
-                    BankAccount.number_hmac,
-                    BankAccount.number_enc,
-                    BankAccount.status,
-                )
-            )
-        ).all()
     if tenant is None:  # pragma: no cover - resolver only returns existing tenants
         return Outcome(Reason.RCPT_UNKNOWN)
+
+    async def run_checks(message: bytes) -> Evaluation:
+        lookup = _account_lookup(deps, tenant_id, await _account_rows(deps, tenant_id))
+        return await asyncio.to_thread(
+            evaluate,
+            message,
+            bank=BankConfig.from_settings(deps.settings),
+            lookup_account=lookup,
+            dnsfunc=deps.dnsfunc,
+            include_own_transfers=tenant.include_own_transfers,
+        )
+
+    result = await run_checks(raw)
+    if (
+        isinstance(result, Dropped)
+        and result.reason == Reason.NOT_TENANT_ACCOUNT
+        and tenant.auto_add_accounts
+    ):
+        hint = credited_account(raw, BankConfig.from_settings(deps.settings))
+        if hint is not None and await _auto_add_account(deps, tenant_id, hint.reveal()):
+            result = await run_checks(raw)  # the bank-signed email named a new shop account
+    del raw  # nothing below may touch the message
+
+    outcome = await _persist(deps, tenant_id, result)
+    log.info(
+        "ingest.result",
+        tenant_id=str(tenant_id),
+        reason_code=outcome.reason.value,
+        msgid_sha256=result.msgid_sha256,
+        transport=transport,
+        transaction_id=str(outcome.transaction_id) if outcome.transaction_id else None,
+    )
+    if outcome.transaction_id is not None:
+        await deps.enqueue_fanout(tenant_id, outcome.transaction_id)
+    return outcome
+
+
+async def _account_rows(deps: IngestDeps, tenant_id: uuid.UUID) -> list[Any]:
+    async with tenant_session(deps.sessionmaker, tenant_id) as s:
+        return list(
+            (
+                await s.execute(
+                    select(
+                        BankAccount.id,
+                        BankAccount.number_hmac,
+                        BankAccount.number_enc,
+                        BankAccount.status,
+                    )
+                )
+            ).all()
+        )
+
+
+def _account_lookup(
+    deps: IngestDeps, tenant_id: uuid.UUID, rows: list[Any]
+) -> Callable[[str], AccountMatch | None]:
     accounts = {
         r.number_hmac: AccountMatch(account_id=r.id, active=r.status == "active") for r in rows
     }
@@ -131,28 +186,61 @@ async def ingest(deps: IngestDeps, rcpt: str, raw: bytes, transport: str = "smtp
         }
         return masked_match(value, numbers)
 
-    result: Evaluation = await asyncio.to_thread(
-        evaluate,
-        raw,
-        bank=BankConfig.from_settings(deps.settings),
-        lookup_account=lookup,
-        dnsfunc=deps.dnsfunc,
-        include_own_transfers=tenant.include_own_transfers,
-    )
-    del raw  # nothing below may touch the message
+    return lookup
 
-    outcome = await _persist(deps, tenant_id, result)
-    log.info(
-        "ingest.result",
-        tenant_id=str(tenant_id),
-        reason_code=outcome.reason.value,
-        msgid_sha256=result.msgid_sha256,
-        transport=transport,
-        transaction_id=str(outcome.transaction_id) if outcome.transaction_id else None,
-    )
-    if outcome.transaction_id is not None:
-        await deps.enqueue_fanout(tenant_id, outcome.transaction_id)
-    return outcome
+
+_AUTO_NUMBER = re.compile(r"[0-9*]{6,34}")
+
+
+async def _auto_add_account(deps: IngestDeps, tenant_id: uuid.UUID, number: str) -> bool:
+    """Tenants with ``auto_add_accounts``: register the account a bank-signed email credited.
+
+    Never duplicates or guesses: a number that could be any existing account (same length, same
+    visible digits) is left alone. The new account joins every active group (or a new "Үндсэн"
+    group) so its income reaches the shop's cashiers; the owner can rename or deactivate it.
+    """
+    number = canonical_account(number)
+    if not _AUTO_NUMBER.fullmatch(number) or sum(c.isdigit() for c in number) < 4:
+        return False
+    aad = field_aad(tenant_id, "bank_account", "number_enc")
+    try:
+        async with tenant_session(deps.sessionmaker, tenant_id) as s:
+            existing = (await s.execute(select(BankAccount.number_enc))).scalars()
+            if any(numbers_overlap(deps.crypto.decrypt_str(e, aad), number) for e in existing):
+                return False
+            account = BankAccount(
+                tenant_id=tenant_id,
+                number_enc=deps.crypto.encrypt(number, aad),
+                number_hmac=account_hmac(deps.crypto, tenant_id, number),
+                alias=f"Данс {masked_label(number)}",
+            )
+            s.add(account)
+            await s.flush()
+            groups = list(
+                await s.scalars(select(RecipientGroup.id).where(RecipientGroup.status == "active"))
+            )
+            if not groups:
+                group = RecipientGroup(tenant_id=tenant_id, name="Үндсэн")
+                s.add(group)
+                await s.flush()
+                groups = [group.id]
+            s.add_all(
+                GroupAccount(tenant_id=tenant_id, group_id=g, account_id=account.id) for g in groups
+            )
+            s.add(
+                AuditLog(
+                    tenant_id=tenant_id,
+                    actor_kind="system",
+                    action="account.auto_add",
+                    object_type="bank_account",
+                    object_id=account.id,
+                    object_label=account.alias,
+                )
+            )
+    except IntegrityError:
+        return True  # added concurrently by another email: the second check finds it
+    get_logger().info("ingest.account_auto_added", tenant_id=str(tenant_id))
+    return True
 
 
 async def _persist(deps: IngestDeps, tenant_id: uuid.UUID, result: Evaluation) -> Outcome:

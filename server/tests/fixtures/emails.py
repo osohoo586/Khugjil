@@ -163,6 +163,8 @@ class FakeGolomt:
     preamble: tuple[str, ...] = ()
     footer: tuple[str, ...] = ()
     split_labels: bool = True  # the amount label on its own line, like the sample
+    # Like the real HTML (2026-11-11): account, description and balance in one row.
+    inline_tail: bool = False
 
     def with_(self, **kw: object) -> FakeGolomt:
         return replace(self, **kw)  # type: ignore[arg-type]
@@ -174,12 +176,9 @@ def golomt_rows(g: FakeGolomt) -> list[list[str]]:
         out += [["Гүйлгээний дүн:"], [g.amount]]
     else:
         out += [["Гүйлгээний дүн:", g.amount]]
-    out += [
-        [f"Гүйлгээний огноо:{g.date}"],
-        [f"Дансны дугаар: {g.account}"],
-        [f"Гүйлгээний утга: {g.description}"],
-        [g.balance],
-    ]
+    out += [[f"Гүйлгээний огноо:{g.date}"]]
+    tail = [f"Дансны дугаар: {g.account}", f"Гүйлгээний утга: {g.description}", g.balance]
+    out += [[" ".join(tail)]] if g.inline_tail else [[t] for t in tail]
     return out + [[f] for f in g.footer]
 
 

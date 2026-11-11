@@ -656,6 +656,7 @@ async def settings_save(
     voice_enabled: Annotated[bool, Form()] = False,
     show_today_totals: Annotated[bool, Form()] = False,
     include_own_transfers: Annotated[bool, Form()] = False,
+    auto_add_accounts: Annotated[bool, Form()] = False,
 ) -> Response:
     try:
         start, end = time.fromisoformat(business_start), time.fromisoformat(business_end)
@@ -688,6 +689,7 @@ async def settings_save(
         }
         t.voice_enabled, t.voice_max_amount = voice_enabled, voice_max
         t.show_today_totals, t.include_own_transfers = show_today_totals, include_own_transfers
+        t.auto_add_accounts = auto_add_accounts
         await ctx.audit(s, "settings.update", object_type="tenant", object_id=ctx.tenant_id)
         device_ids = list(await s.scalars(select(Device.id).where(Device.status == "active")))
     for device_id in device_ids:

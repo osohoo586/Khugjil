@@ -19,7 +19,7 @@ from dkim.dnsplug import get_txt
 from sqlalchemy import select
 
 from khugjil.crypto import Purpose, field_aad
-from khugjil.db.models import BankAccount
+from khugjil.db.models import BankAccount, Tenant
 from khugjil.db.tenancy import tenant_session
 from khugjil.ingest import mime
 from khugjil.ingest.checks import Accepted, AccountMatch, BankConfig, evaluate, masked_match
@@ -48,6 +48,9 @@ async def main(path: Path, deliver: bool) -> int:
     try:
         async with tenant_session(rt.sm, tenant_id) as s:
             rows = (await s.execute(select(BankAccount))).scalars().all()
+            tenant = await s.get(Tenant, tenant_id)
+        auto = bool(tenant and tenant.auto_add_accounts)
+        print(f"auto-add unregistered accounts: {'on' if auto else 'off'}")
         aad = field_aad(tenant_id, "bank_account", "number_enc")
         numbers = {
             rt.crypto.decrypt_str(r.number_enc, aad): AccountMatch(r.id, r.status == "active")

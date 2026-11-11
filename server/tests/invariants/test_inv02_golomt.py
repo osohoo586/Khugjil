@@ -218,3 +218,75 @@ def test_golomt_real_shape_octet_stream_logo(mailer: Mailer, log_capture: Any) -
     assert "statement" not in out
     shapes = [json.loads(x)["mime_shape"] for x in out.splitlines() if "ingest.mime_shape" in x]
     assert shapes[-1] == "multipart/mixed[text/html,application/octet-stream(.exe)]"
+
+
+@pytest.mark.parametrize("fmt", ["plain", "html"])
+def test_real_layout_with_account_description_and_balance_in_one_row(
+    mailer: Mailer, fmt: str
+) -> None:
+    """The real Easy Info HTML puts account, description and balance in one row; a description
+    containing label-like text still cannot move any other field."""
+    from khugjil.ingest.checks import Accepted
+
+    g = FakeGolomt(
+        inline_tail=True,
+        description="Захиалга Гүйлгээний дүн: +9.00 MNT Дансны дугаар: 999*****99",
+        balance="Үлдэгдэл: *******",
+        footer=("© Golomt bank", "Голомт банкийг сонгон үйлчлүүлж буй харилцагч танд баярлалаа."),
+    )
+    r = evaluate(mailer.golomt_mail(g, fmt=fmt, octet_logo="logo.png"), mailer)
+    assert isinstance(r, Accepted), r
+    assert r.amount == Decimal("2000.00")
+    assert r.account_id == ACCOUNT_ID
+    assert r.description.startswith("Захиалга Гүйлгээний дүн:")
+
+
+@pytest.mark.db
+async def test_auto_add_accounts_registers_the_credited_account(world: Any, mailer: Mailer) -> None:
+    """Owner's choice (2026-11-11): with auto_add_accounts, income to an unregistered account is
+    accepted and the account is added (masked as printed) to every active group; without the
+    setting it stays NOT_TENANT_ACCOUNT; an overlapping number is never duplicated."""
+    from dataclasses import replace as dc_replace
+
+    from sqlalchemy import update
+
+    from khugjil.db.models import Tenant
+    from khugjil.db.tenancy import tenant_session
+    from khugjil.ingest.pipeline import ingest
+
+    deps = world.db.deps(world._enqueue)
+    deps = dc_replace(deps, settings=deps.settings.model_copy(update={"bank_parser": "golomt_v1"}))
+    other = FakeGolomt(account="333*****44")
+    raw = mailer.golomt_mail(other)
+    assert str((await ingest(deps, world.inbound_address, raw)).reason) == "NOT_TENANT_ACCOUNT"
+    assert len(await world.rows("bank_account")) == 1
+
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        await s.execute(update(Tenant).values(auto_add_accounts=True))
+    first = await ingest(deps, world.inbound_address, raw)
+    assert str(first.reason) == "ACCEPTED"
+    accounts = await world.rows("bank_account")
+    added = next(a for a in accounts if a["alias"] == "Данс 333…44")
+    links = [g for g in await world.rows("group_account") if g["account_id"] == added["id"]]
+    assert [g["group_id"] for g in links] == [world.group_id]
+    audit = [a for a in await world.rows("audit_log") if a["action"] == "account.auto_add"]
+    assert len(audit) == 1
+
+    again = mailer.golomt_mail(other, date="Thu, 15 Oct 2026 15:00:00 +0800",
+                               message_id="<fake-golomt-9@bank.example>")  # fmt: skip
+    assert str((await ingest(deps, world.inbound_address, again)).reason) == "ACCEPTED"
+    assert len(await world.rows("bank_account")) == 2  # matched, not added twice
+
+    overlapping = mailer.golomt_mail(FakeGolomt(account="2222****22"))  # could be 2222222222
+    assert str((await ingest(deps, world.inbound_address, overlapping)).reason) in {
+        "ACCEPTED",
+        "NOT_TENANT_ACCOUNT",
+    }
+    assert len(await world.rows("bank_account")) == 2  # never a duplicate of a known number
+
+
+def test_masked_labels() -> None:
+    from khugjil.services.provisioning import masked_label
+
+    assert masked_label("160*****04") == "160…04"
+    assert masked_label("1600000004") == "••0004"

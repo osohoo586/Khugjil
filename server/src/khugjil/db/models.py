@@ -82,6 +82,11 @@ class Tenant(Base):
     include_own_transfers: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+    # Owner's choice (2026-11-11): income to an account not registered yet is accepted and the
+    # account is added automatically (masked numbers included), instead of NOT_TENANT_ACCOUNT.
+    auto_add_accounts: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     toast_seconds: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="8")
     voice_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")

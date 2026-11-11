@@ -565,3 +565,19 @@ async def test_email_page_offers_googles_confirmation_link(
     assert f'href="{link}"' in page
     assert 'rel="noopener noreferrer"' in page
     assert "Gmail дамжуулалтыг баталгаажуулах" in page
+
+
+async def test_settings_toggle_auto_add_accounts(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any
+) -> None:
+    h, csrf, _ = owner
+    page = (await h.client.get("/settings")).text
+    assert 'name="auto_add_accounts"' in page
+    data = {
+        "csrf": csrf, "accent": "green", "toast_seconds": "8", "health_silence_hours": "4",
+        "shift_idle_hours": "8", "business_start": "09:00", "business_end": "21:00",
+        "auto_add_accounts": "true",
+    }  # fmt: skip
+    assert (await h.client.post("/settings", data=data)).status_code == 303
+    tenant = (await world.rows("tenant"))[0]
+    assert tenant["auto_add_accounts"] is True

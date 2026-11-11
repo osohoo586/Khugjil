@@ -28,6 +28,7 @@
     </div>
     <div class="weekdays">{% for d in WEEKDAYS %}<label class="check"><input type="checkbox" name="business_days" value="{{ loop.index0 }}"{% if loop.index0 in t.business_hours.get("days", []) %} checked{% endif %}> {{ d }}</label>{% endfor %}</div>
     <label class="check"><input type="checkbox" name="include_own_transfers" value="true"{% if t.include_own_transfers %} checked{% endif %}> Өөрийн данс хоорондын шилжүүлгийг орлогод тооцох</label>
+    <label class="check"><input type="checkbox" name="auto_add_accounts" value="true"{% if t.auto_add_accounts %} checked{% endif %}> Бүртгэлгүй данс руу орсон орлогыг хүлээн авч, дансыг автоматаар нэмэх</label>
   </fieldset>
   <button class="btn btn-primary" type="submit">Хадгалах</button>
 </form>
