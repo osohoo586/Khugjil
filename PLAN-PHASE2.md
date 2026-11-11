@@ -334,7 +334,30 @@ Recommended defaults are marked; answer "P2: defaults OK" to accept all of them.
 - **P2-Q12. Toolchain.** May I install Rust with `rustup` (Homebrew) on this Mac for local builds
   and tests? Windows installers are built only in GitHub Actions.
 
-## 10. What does not change
+## 10. Implementation notes (2026-11-11)
+
+Built on the `phase2` branch with the §9 defaults. Where the code differs from the text above:
+
+- **Who drives the overlay.** Rust holds the stream and forwards events to the main window; the
+  main window runs the shared `CashierApp` and sends each note to the overlay through Rust
+  (`overlay_show`), which re-validates it. This keeps live and caught-up transactions (after a
+  reconnect) on one code path. The main window keeps running when it is hidden in the tray.
+- **Updates** are checked at start-up and whenever the server answers 426, not every 6 hours. The
+  agent starts at Windows sign-in, and `KHJ_AGENT_MIN_VERSION` forces an update sooner.
+- **Logging.** There is no log file in 0.1.0 (nothing is written to disk). Debug builds print
+  command names and API paths to stderr.
+- **Tray.** No mute item yet (the chime is controlled in the cashier view); start-at-sign-in is a
+  tray check item and is switched on after a successful pairing.
+- **Credential entry on uninstall.** The NSIS uninstaller does not remove the Credential Manager
+  entry; revoking the device in the admin panel invalidates it, and the agent deletes it on the
+  next 401.
+- **Credential store crate.** `keyring` 3.6.3 (Windows Credential Manager backend).
+- **TLS.** Mozilla's public roots only (`webpki-root-certs`), no redirects, HTTPS only (P2-Q10).
+- **Updater** built without zip support: updates are the signed NSIS `.exe` itself.
+- **Not verifiable on macOS:** the Win32 overlay behaviour, WebView2 autoplay and SmartScreen. The
+  manual checklist in `docs/agent.md` covers them.
+
+## 11. What does not change
 
 - The SPEC §3 invariants, the email pipeline and the Telegram channel.
 - The web cashier and its tests: the agent is an additional `kind`, not a replacement.
