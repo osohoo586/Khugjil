@@ -136,3 +136,18 @@ def test_failed_bank_email_logs_only_its_signing_domains(mailer: Mailer, log_cap
     assert [x["dkim_domains"] for x in lines] == ["attacker.example"]
     assert evaluate(build_golomt_message(), mailer).reason.value == "AUTH_FAIL"
     assert '"dkim_domains": "-"' in log_capture.getvalue()
+
+
+def test_signature_domains_edge_cases(mailer: Mailer) -> None:
+    from khugjil.ingest.dkim_arc import signature_domains
+
+    signed = mailer.golomt_mail()
+    assert signature_domains(signed) == ["bank.example"]
+    assert signature_domains(build_golomt_message()) == []
+    assert signature_domains(b"\x00") == []
+    broken = b"DKIM-Signature: v=1; this is not a tag list\r\n" + signed
+    assert signature_domains(broken) == ["bank.example"]
+    odd = b"DKIM-Signature: v=1; d=bad_domain!; s=x; b=a\r\n" + signed
+    assert signature_domains(odd) == ["bank.example"]
+    many = b"".join(b"DKIM-Signature: v=1; d=d%d.example; b=a\r\n" % i for i in range(8)) + signed
+    assert signature_domains(many, limit=3) == ["d0.example", "d1.example", "d2.example"]
