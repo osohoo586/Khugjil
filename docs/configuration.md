@@ -19,6 +19,7 @@ that file. Generate key material locally with `cd server && uv run khugjil keys 
 | `KHJ_TELEGRAM_BOT_TOKEN`, `KHJ_TELEGRAM_WEBHOOK_SECRET`, `KHJ_TELEGRAM_BOT_USERNAME` | optional | Telegram channel |
 | `KHJ_VAPID_PRIVATE_KEY`, `KHJ_VAPID_PUBLIC_KEY`, `KHJ_VAPID_SUBJECT` | yes for Web Push | `khugjil keys generate` prints a pair |
 | `KHJ_CF_INGEST_SECRET` | only for the Cloudflare fallback | PLAN Q4 |
+| `KHJ_PUBLIC_PORT` | no | Local development only: HTTPS port when it is not 443 (`scripts/dev-up.sh` uses 8443). Refused in production |
 | `KHJ_AGENT_DEVICES_ENABLED` | no | `false` (default). `true` allows Windows desktop agents to pair and use bearer tokens (PLAN-PHASE2) |
 | `KHJ_AGENT_MIN_VERSION` | no | Oldest agent version the server accepts, `MAJOR.MINOR.PATCH` (default `0.1.0`); older agents get HTTP 426 and update themselves |
 

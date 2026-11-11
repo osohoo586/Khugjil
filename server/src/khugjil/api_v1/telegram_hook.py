@@ -224,7 +224,7 @@ async def set_webhook(rt: Runtime) -> int:
     resp = await rt.http.post(
         f"{TELEGRAM_API}/bot{token.get_secret_value()}/setWebhook",
         json={
-            "url": f"https://{rt.settings.app_host}/hooks/telegram",
+            "url": f"{rt.settings.app_origin}/hooks/telegram",
             "secret_token": secret.get_secret_value(),
             "allowed_updates": ["message", "callback_query", "my_chat_member"],
             "drop_pending_updates": True,

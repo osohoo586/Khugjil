@@ -49,9 +49,9 @@ async def create_invite(
     return token
 
 
-def invite_link(settings_app_host: str, settings_admin_host: str, role: str, token: str) -> str:
-    host = settings_admin_host if role in LOGIN_ROLES else settings_app_host
-    return f"https://{host}/invite#t={token}"
+def invite_link(app_origin: str, admin_origin: str, role: str, token: str) -> str:
+    origin = admin_origin if role in LOGIN_ROLES else app_origin
+    return f"{origin}/invite#t={token}"
 
 
 async def create_owner_invite(
@@ -65,7 +65,7 @@ async def create_owner_invite(
         s.add(owner)
         await s.flush()
         token = await create_invite(s, tenant_id, owner.id, created_by=None, now=now)
-    return invite_link(rt.settings.app_host, rt.settings.admin_host, "owner", token)
+    return invite_link(rt.settings.app_origin, rt.settings.admin_origin, "owner", token)
 
 
 @dataclass(frozen=True)

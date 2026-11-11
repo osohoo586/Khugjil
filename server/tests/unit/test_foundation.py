@@ -41,6 +41,22 @@ def test_production_refuses_dev_routes() -> None:
         make_settings(env="production", dev_routes=True)
 
 
+def test_public_port_is_development_only() -> None:
+    s = make_settings()
+    assert (s.app_origin, s.admin_origin) == (
+        "https://app.khugjil.test",
+        "https://admin.khugjil.test",
+    )
+    dev = make_settings(env="development", public_port=8443)
+    assert dev.app_origin == "https://app.khugjil.test:8443"
+    assert dev.admin_origin == "https://admin.khugjil.test:8443"
+    assert make_settings(env="production", public_port=443).app_origin == "https://app.khugjil.test"
+    with pytest.raises(ValidationError):
+        make_settings(env="production", public_port=8443)
+    with pytest.raises(ValidationError):
+        make_settings(public_port=0)
+
+
 def test_agent_settings() -> None:
     from khugjil.settings import parse_agent_version
 

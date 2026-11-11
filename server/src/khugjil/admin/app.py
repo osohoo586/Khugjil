@@ -72,5 +72,5 @@ def build(holder: RuntimeHolder) -> ASGIApp:
     async def validation_error(_: Request, __: Any) -> Response:
         return error_page(400)
 
-    origin = f"https://{holder.settings.admin_host}"
+    origin = holder.settings.admin_origin
     return SecurityHeaders(OriginGuard(app, origin), ADMIN_CSP, no_store_prefixes=("/",))

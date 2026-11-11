@@ -114,7 +114,7 @@ async def member_invite(
         await ctx.audit(
             s, "member.invite", object_type="member", object_id=member.id, label=member.display_name
         )
-    link = invite_link(ctx.rt.settings.app_host, ctx.rt.settings.admin_host, role, token)
+    link = invite_link(ctx.rt.settings.app_origin, ctx.rt.settings.admin_origin, role, token)
     return ctx.render("invite_created.html", member=member, link=link)
 
 
@@ -263,7 +263,7 @@ async def member_reinvite(ctx: Manager, member_id: uuid.UUID) -> Response:
             label=member.display_name,
         )
     await end_member_sessions(ctx.rt.sm, ctx.tenant_id, member_id)
-    link = invite_link(ctx.rt.settings.app_host, ctx.rt.settings.admin_host, member.role, token)
+    link = invite_link(ctx.rt.settings.app_origin, ctx.rt.settings.admin_origin, member.role, token)
     return ctx.render("invite_created.html", member=member, link=link)
 
 
@@ -394,7 +394,8 @@ async def device_pair(
     except PairingError:
         raise HTTPException(400) from None
     # Agent codes are typed into the desktop program; there is no QR link to open in a browser.
-    url = f"https://{ctx.rt.settings.app_host}/pair#t={pairing.token}" if kind == "web" else None
+    app_origin = ctx.rt.settings.app_origin
+    url = f"{app_origin}/pair#t={pairing.token}" if kind == "web" else None
     template = "_pair_dialog.html" if ctx.request.headers.get("hx-request") else "pair.html"
     return ctx.render(
         template,
@@ -402,7 +403,7 @@ async def device_pair(
         url=url,
         kind=kind,
         device_name=device_name,
-        app_host=ctx.rt.settings.app_host,
+        app_host=app_origin.removeprefix("https://"),
     )
 
 

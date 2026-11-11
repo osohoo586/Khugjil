@@ -47,7 +47,7 @@ def build_cashier_app(holder: RuntimeHolder) -> ASGIApp:
             {"error": "bad_request", "message": cashier.MESSAGES["bad_request"]}, status_code=400
         )
 
-    origin = f"https://{holder.settings.app_host}"
+    origin = holder.settings.app_origin
     guarded = OriginGuard(
         app,
         origin,

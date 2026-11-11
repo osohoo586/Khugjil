@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     cf_ingest_secret: SecretStr | None = None
 
     dev_routes: bool = False
+    # Local development only: the HTTPS port in front of the app when it cannot be 443 (for example
+    # a local Caddy on 8443). Origins and generated links then include it. Refused in production.
+    public_port: int | None = Field(default=None, ge=1, le=65535)
     # Phase 2 desktop agent (PLAN-PHASE2.md). Off until the agent ships.
     agent_devices_enabled: bool = False
     agent_min_version: str = "0.1.0"
@@ -107,6 +110,8 @@ class Settings(BaseSettings):
     def _production_guards(self) -> Settings:
         if self.env == "production" and self.dev_routes:
             raise ValueError("dev_routes must be disabled in production")
+        if self.env == "production" and self.public_port not in (None, 443):
+            raise ValueError("public_port is for local development only")
         return self
 
     @cached_property
@@ -124,6 +129,19 @@ class Settings(BaseSettings):
     @property
     def admin_host(self) -> str:
         return f"admin.{self.domain}"
+
+    def _origin(self, host: str) -> str:
+        port = f":{self.public_port}" if self.public_port not in (None, 443) else ""
+        return f"https://{host}{port}"
+
+    @property
+    def app_origin(self) -> str:
+        """``https://app.<DOMAIN>`` (plus the port in local development)."""
+        return self._origin(self.app_host)
+
+    @property
+    def admin_origin(self) -> str:
+        return self._origin(self.admin_host)
 
     @property
     def inbound_domain(self) -> str:

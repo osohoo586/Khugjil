@@ -26,6 +26,8 @@ make coverage                 # pytest + per-package >= 95% coverage gate
 make cashier-check            # eslint, tsc, vitest, npm audit (cashier PWA)
 make e2e                      # Playwright screenshot tests (see e2e/README.md)
 make agent-check              # desktop agent: capability guard, rustfmt, clippy, Rust tests
+./scripts/dev-up.sh           # run it locally: https://admin.khugjil.localhost:8443 (Caddy local CA)
+./scripts/dev-down.sh         # stop it (--wipe also deletes the dev database)
 ```
 
 The Windows desktop agent (Phase 2) lives in `agent/`; see [`docs/agent.md`](docs/agent.md).

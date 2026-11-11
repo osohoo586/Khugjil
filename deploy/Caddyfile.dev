@@ -1,0 +1,50 @@
+# Local development only (scripts/dev-up.sh): same sites as deploy/Caddyfile, but with Caddy's own
+# local CA instead of Let's Encrypt, on port 8443, in front of the API running on the host.
+# Browsers will warn about the certificate until Caddy's local root is trusted (see the script).
+{
+	local_certs
+	skip_install_trust
+	auto_https disable_redirects
+	https_port 8443
+	servers {
+		protocols h1 h2
+	}
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		Cross-Origin-Opener-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+}
+
+app.{$KHJ_DOMAIN} {
+	import security
+	encode zstd gzip
+
+	@backend path /api/* /hooks/*
+	handle @backend {
+		reverse_proxy host.docker.internal:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types khj"
+		header Cache-Control "no-cache"
+		root * /srv/cashier
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+admin.{$KHJ_DOMAIN} {
+	import security
+	encode zstd gzip
+	reverse_proxy host.docker.internal:8000
+}
