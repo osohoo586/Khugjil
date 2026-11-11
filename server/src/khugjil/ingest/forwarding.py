@@ -86,7 +86,9 @@ def confirmation_code(msg: EmailMessage, raw: bytes, dnsfunc: DnsFunc) -> str | 
 def shape(msg: Message) -> str:
     """MIME structure only, e.g. ``multipart/alternative[text/plain,text/html]``."""
     if not msg.is_multipart():
-        return msg.get_content_type()
+        # A file name's extension only (e.g. ".png"), never the name itself.
+        ext = re.search(r"(\.[A-Za-z0-9]{1,5})$", (msg.get_filename() or "").strip())
+        return msg.get_content_type() + (f"({ext.group(1).lower()})" if ext else "")
     parts = msg.get_payload()
     if not isinstance(parts, list):
         return f"{msg.get_content_type()}[?]"

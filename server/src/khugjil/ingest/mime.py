@@ -26,6 +26,15 @@ _ALLOWED_LEAF_TYPES = frozenset({"text/plain", "text/html"})
 # raster images are skipped: never decoded, never read. SVG (scriptable) and every other
 # non-text part still count as attachments and drop the email.
 _SKIPPED_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif"})
+# Golomt declares its logo as application/octet-stream; with an image file name it is skipped too.
+_IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif"})
+
+
+def image_filename(part: Message) -> bool:
+    name = (part.get_filename() or "").strip().lower()
+    return any(name.endswith(ext) for ext in _IMAGE_EXTENSIONS)
+
+
 _ALLOWED_MULTIPART = frozenset({"multipart/alternative", "multipart/mixed", "multipart/related"})
 
 Rows = list[list[str]]
@@ -75,7 +84,9 @@ def _leaves(part: Message, depth: int) -> list[Message] | Reason:
                 return got
             out.extend(got)
         return out
-    if ctype in _SKIPPED_IMAGE_TYPES:
+    if ctype in _SKIPPED_IMAGE_TYPES or (
+        ctype == "application/octet-stream" and image_filename(part)
+    ):
         return []
     if part.get_filename() is not None or part.get_content_disposition() == "attachment":
         return Reason.ATTACHMENT

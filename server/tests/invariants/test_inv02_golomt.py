@@ -199,3 +199,22 @@ def test_logo_image_is_skipped_but_other_attachments_drop(
     shapes = [json.loads(x)["mime_shape"] for x in out.splitlines() if "ingest.mime_shape" in x]
     assert shapes
     assert "application/pdf" in shapes[-1]
+
+
+def test_golomt_real_shape_octet_stream_logo(mailer: Mailer, log_capture: Any) -> None:
+    """Golomt's real email (seen 2026-11-11, shape only): multipart/mixed[text/html,
+    application/octet-stream]. An octet-stream part with an image file name is skipped unread;
+    any other octet-stream still drops the email and logs only the extension."""
+    import json
+
+    from khugjil.ingest.checks import Accepted
+
+    ok = mailer.golomt_mail(fmt="html", octet_logo="logo.PNG")
+    assert isinstance(evaluate(ok, mailer), Accepted)
+    bad = mailer.golomt_mail(fmt="html", octet_logo="statement-MARKER.exe")
+    assert str(evaluate(bad, mailer).reason) == "ATTACHMENT"
+    out = log_capture.getvalue()
+    assert "MARKER" not in out
+    assert "statement" not in out
+    shapes = [json.loads(x)["mime_shape"] for x in out.splitlines() if "ingest.mime_shape" in x]
+    assert shapes[-1] == "multipart/mixed[text/html,application/octet-stream(.exe)]"

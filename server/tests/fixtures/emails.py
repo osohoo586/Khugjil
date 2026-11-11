@@ -192,6 +192,7 @@ def build_golomt_message(
     date: str = "Thu, 15 Oct 2026 14:05:09 +0800",
     logo: bool = False,
     pdf: bool = False,
+    octet_logo: str | None = None,
 ) -> bytes:
     g = g or FakeGolomt()
     msg = EmailMessage()
@@ -212,6 +213,9 @@ def build_golomt_message(
         msg.set_content(text, charset="utf-8", cte="base64")
     if logo:  # like Gmail's "Attachments": the bank's logo image
         msg.add_related(b"\x89PNG\r\n\x1a\nfake", maintype="image", subtype="png", cid="<logo>")
+    if octet_logo is not None:  # like Golomt's real email: the logo as application/octet-stream
+        msg.add_attachment(b"\x89PNG\r\n\x1a\nfake", maintype="application",
+                           subtype="octet-stream", filename=octet_logo)  # fmt: skip
     if pdf:
         msg.add_attachment(b"%PDF-1.4 fake", maintype="application", subtype="pdf",
                            filename="statement.pdf")  # fmt: skip
