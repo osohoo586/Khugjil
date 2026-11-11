@@ -19,6 +19,7 @@ htmlcov/
 # Node / frontend
 node_modules/
 cashier/dist/
+cashier/dist-agent/
 e2e/test-results/
 e2e/playwright-report/
 

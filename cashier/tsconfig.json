@@ -22,7 +22,8 @@
   },
   "include": [
     "src/**/*.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vite.agent.config.ts"
   ],
   "exclude": [
     "src/sw.ts"

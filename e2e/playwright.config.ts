@@ -11,5 +11,6 @@ export default defineConfig({
   webServer: [
     { command: "node serve.mjs cashier 4173", url: "http://127.0.0.1:4173/", reuseExistingServer: true },
     { command: "node serve.mjs admin 4174", url: "http://127.0.0.1:4174/login", reuseExistingServer: true },
+    { command: "node serve.mjs agent 4175", url: "http://127.0.0.1:4175/overlay.html", reuseExistingServer: true },
   ],
 });

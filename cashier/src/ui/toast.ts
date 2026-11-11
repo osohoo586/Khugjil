@@ -21,6 +21,8 @@ export class ToastStack {
   constructor(
     private readonly root: HTMLElement,
     private seconds: number,
+    // The agent's overlay window resizes itself to its toasts and closes them on click.
+    private readonly options: { onChange?: (visible: number) => void; dismissOnClick?: boolean } = {},
   ) {
     this.more = h("div", { class: "toast-more", hidden: true });
     this.root.append(this.more);
@@ -56,9 +58,16 @@ export class ToastStack {
     const entry: Entry = { el, remaining: this.seconds * 1000, started: Date.now(), timer: null };
     el.addEventListener("mouseenter", () => this.pause(entry));
     el.addEventListener("mouseleave", () => this.resume(entry));
+    if (this.options.dismissOnClick) {
+      el.addEventListener("click", () => {
+        if (entry.timer) clearTimeout(entry.timer);
+        this.dismiss(entry);
+      });
+    }
     this.root.append(el);
     this.entries.push(entry);
     this.resume(entry);
+    this.options.onChange?.(this.entries.length);
   }
 
   private pause(entry: Entry): void {
@@ -81,6 +90,7 @@ export class ToastStack {
       this.hidden = 0;
       this.more.hidden = true;
     }
+    this.options.onChange?.(this.entries.length);
   }
 
   get visibleCount(): number {

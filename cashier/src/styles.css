@@ -99,3 +99,8 @@ body[data-layout="compact"] .hero-amount { font-size: var(--fs-xl); }
 body[data-layout="compact"] .table th, body[data-layout="compact"] .table td { padding: var(--sp-0) var(--sp-1); }
 body[data-layout="compact"] .toasts { left: var(--sp-1); right: var(--sp-1); align-items: stretch; }
 body[data-layout="compact"] .toast { width: auto; }
+
+/* Agent overlay window (overlay.html): the window is exactly as large as its toast stack. */
+html.overlay, html.overlay body { background: transparent; min-height: 0; overflow: hidden; }
+html.overlay .toasts { position: static; padding: 0; align-items: stretch; }
+html.overlay .toast { width: 100%; cursor: default; }

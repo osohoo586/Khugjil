@@ -9,7 +9,8 @@
     "build": "npm run sync-shared && npm run typecheck && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sw.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:agent": "npm run sync-shared && npm run typecheck && vite build -c vite.agent.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -22,5 +23,8 @@
   },
   "overrides": {
     "minimatch": "11.0.5"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.4"
   }
 }

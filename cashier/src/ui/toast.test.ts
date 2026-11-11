@@ -41,4 +41,23 @@ describe("ToastStack", () => {
     stack.clear();
     expect(stack.visibleCount).toBe(0);
   });
+
+  it("reports size changes and closes on click when used as the agent overlay", () => {
+    const root = document.createElement("div");
+    const counts: number[] = [];
+    const stack = new ToastStack(root, 8, { onChange: (n) => counts.push(n), dismissOnClick: true });
+    stack.push(txn({ id: "a" }), true);
+    stack.push(txn({ id: "b" }), true);
+    root.querySelector<HTMLElement>(".toast")?.click();
+    vi.advanceTimersByTime(8000);
+    expect(counts).toEqual([1, 2, 1, 0]);
+  });
+
+  it("does not close on click in the browser cashier", () => {
+    const root = document.createElement("div");
+    const stack = new ToastStack(root, 8);
+    stack.push(txn(), true);
+    root.querySelector<HTMLElement>(".toast")?.click();
+    expect(stack.visibleCount).toBe(1);
+  });
 });
