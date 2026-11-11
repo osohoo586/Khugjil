@@ -21,6 +21,7 @@ from khugjil.web.base import RuntimeHolder
 APP = "https://app.khugjil.test"
 ADMIN = "https://admin.khugjil.test"
 PIN = "482913"
+AGENT_VERSION = "0.1.0"
 
 
 @dataclass
@@ -43,11 +44,14 @@ class ApiHarness:
     arq: FakeArq
 
     @classmethod
-    async def create(cls, world: Any, dnsfunc: Any, base_url: str = APP) -> ApiHarness:
+    async def create(
+        cls, world: Any, dnsfunc: Any, base_url: str = APP, *, agent_devices: bool = False
+    ) -> ApiHarness:
         db = world.db
+        settings = db.settings.model_copy(update={"agent_devices_enabled": agent_devices})
         arq = FakeArq()
         rt = Runtime(
-            settings=db.settings,
+            settings=settings,
             crypto=db.crypto,
             engine=db.app_engine,
             sm=db.sm,
@@ -55,7 +59,7 @@ class ApiHarness:
             arq=arq,  # type: ignore[arg-type]
             http=httpx.AsyncClient(),
         )
-        holder = RuntimeHolder(settings=db.settings, rt=rt, dnsfunc=dnsfunc)
+        holder = RuntimeHolder(settings=settings, rt=rt, dnsfunc=dnsfunc)
         app = create_app(holder)
         client = httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
@@ -72,8 +76,11 @@ class ApiHarness:
         await self.client.aclose()
         await self.rt.http.aclose()
 
-    async def new_pairing(self, group_ids: list[uuid.UUID] | None = None) -> Any:
+    async def new_pairing(
+        self, group_ids: list[uuid.UUID] | None = None, kind: str | None = None
+    ) -> Any:
         w = self.world
+        extra = {"kind": kind} if kind else {}  # Phase 1 signature has no kind
         async with tenant_session(w.db.sm, w.tenant_id) as s:
             return await create_pairing(
                 s,
@@ -83,7 +90,38 @@ class ApiHarness:
                 group_ids=group_ids or [w.group_id],
                 created_by=None,
                 now=datetime.now(UTC),
+                **extra,
             )
+
+    def agent_client(
+        self, token: str | None = None, version: str | None = AGENT_VERSION
+    ) -> httpx.AsyncClient:
+        """A client shaped like the desktop agent's Rust core: no Origin, no cookies, bearer."""
+        headers = {"x-khj-agent": version} if version else {}
+        if token:
+            headers["authorization"] = f"Bearer {token}"
+        return httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=self.app), base_url=APP, headers=headers
+        )
+
+    async def pair_agent(self) -> str:
+        pairing = await self.new_pairing(kind="agent")
+        async with self.agent_client() as c:
+            r = await c.post("/api/v1/pair", json={"token": pairing.token, "client": "agent"})
+        assert r.status_code == 200, r.text
+        token: str = r.json()["device_token"]
+        return token
+
+    async def agent_ready(self) -> str:
+        """Paired agent device with an open shift for the world's cashier; returns its token."""
+        token = await self.pair_agent()
+        await self.set_pin()
+        async with self.agent_client(token) as c:
+            r = await c.post(
+                "/api/v1/shift/start", json={"member_id": str(self.world.member_id), "pin": PIN}
+            )
+        assert r.status_code == 200, r.text
+        return token
 
     async def pair(self) -> None:
         pairing = await self.new_pairing()
