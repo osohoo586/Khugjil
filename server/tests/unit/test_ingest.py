@@ -384,3 +384,37 @@ def test_unrecognised_gmail_confirmation_logs_only_its_shape(
     assert line["fwd_shape"] == "multipart/alternative[text/plain,text/html]"
     assert line["fwd_digits"].startswith("subject:- hash:0 body:4,5 ")
     assert "12345" not in json.dumps(line)
+
+
+def _gmail_link_mail(body: str) -> bytes:
+    from email.message import EmailMessage
+    from email.policy import SMTP
+
+    msg = EmailMessage()
+    msg["From"] = "Gmail Team <forwarding-noreply@google.com>"
+    msg["To"] = "fake@in.khugjil.test"
+    msg["Subject"] = "Gmail Forwarding Confirmation - Receive Mail from shop.owner586@gmail.example"
+    msg["Date"] = "Thu, 15 Oct 2026 08:40:00 +0800"
+    msg["Message-ID"] = "<fwd-5@google.com>"
+    msg.set_content(body)
+    return msg.as_bytes(policy=SMTP)
+
+
+def test_current_gmail_confirmation_keeps_only_googles_link(mailer: Mailer) -> None:
+    """Gmail now sends a link and no code: keep Google's link (for the owner to open), nothing
+    else; other domains are never kept."""
+    link = "https://mail-settings.google.com/mail/vf-%5BANGjdJ8x%5D-abc_DEF-1x2y3z4"
+    body = (
+        "shop.owner586@gmail.example has requested to automatically forward mail to your\r\n"
+        "address. To allow it, please click the link below to confirm the request:\r\n"
+        f"{link}\r\n\r\nIf the link does not work, see https://support.google.com/mail\r\n"
+    )
+    r = evaluate(_google_signed(mailer, _gmail_link_mail(body)), mailer)
+    assert isinstance(r, ForwardingCode)
+    assert r.code.reveal() == link
+    phish = body.replace(
+        "https://mail-settings.google.com/", "https://mail-settings.google.com.evil.example/"
+    )
+    r = evaluate(_google_signed(mailer, _gmail_link_mail(phish)), mailer)
+    assert isinstance(r, Dropped)
+    assert r.reason == Reason.FWD_CONFIRM_UNRECOGNIZED

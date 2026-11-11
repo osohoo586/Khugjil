@@ -536,3 +536,32 @@ async def test_overview_flags_set_ups_that_receive_nothing(
     assert "Касс-хоосон төхөөрөмж данстай бүлэгт ороогүй тул гүйлгээ харахгүй." in page
     assert "Б. Сараа данстай бүлэгт" not in page  # the world's cashier is reached
     assert "Касс-1 төхөөрөмж данстай" not in page
+
+
+async def test_email_page_offers_googles_confirmation_link(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from khugjil.crypto import field_aad
+    from khugjil.db.models import ForwardingConfirmation
+    from khugjil.db.tenancy import tenant_session
+
+    h, _, _ = owner
+    link = "https://mail-settings.google.com/mail/vf-%5BABC%5D-xyz"
+    now = datetime.now(UTC)
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        s.add(
+            ForwardingConfirmation(
+                tenant_id=world.tenant_id,
+                code_enc=world.db.crypto.encrypt(
+                    link, field_aad(world.tenant_id, "forwarding_confirmation", "code_enc")
+                ),
+                received_at=now,
+                expires_at=now + timedelta(hours=1),
+            )
+        )
+    page = (await h.client.get("/email")).text
+    assert f'href="{link}"' in page
+    assert 'rel="noopener noreferrer"' in page
+    assert "Gmail дамжуулалтыг баталгаажуулах" in page

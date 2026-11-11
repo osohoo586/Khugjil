@@ -89,7 +89,7 @@ def pages() -> dict[str, tuple[str, dict[str, Any]]]:
         }),
         "email": ("email.html", {
             "notice": None, "address": "k7q2m4x9d3ta6vwe5hb2nrfy@in.example.mn",
-            "fwd_code": "123456789", "fwd_expires": datetime(2026, 10, 16, 0, 40, tzinfo=UTC),
+            "fwd_code": "123456789", "fwd_link": None, "fwd_expires": datetime(2026, 10, 16, 0, 40, tzinfo=UTC),
             "events": [(datetime(2026, 10, 15, 0, 37, tzinfo=UTC), "Хүлээн авсан"),
                        (datetime(2026, 10, 15, 0, 12, tzinfo=UTC), "Татгалзсан — DKIM баталгаажаагүй"),
                        (datetime(2026, 10, 14, 13, 3, tzinfo=UTC), "Алгассан — давхардсан гүйлгээ")],

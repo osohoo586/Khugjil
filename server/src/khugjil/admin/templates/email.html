@@ -21,7 +21,8 @@
   <ol class="steps">
     <li><strong>Дамжуулах хаяг нэмэх.</strong> Gmail → Тохиргоо → «Дамжуулалт ба POP/IMAP» → «Дамжуулах хаяг нэмэх» хэсэгт дээрх хаягийг оруулна. <span class="placeholder">[зураг]</span></li>
     <li><strong>Баталгаажуулах код.</strong>
-      {% if fwd_code %}Gmail-ээс ирсэн код: <strong class="code tabular">{{ fwd_code }}</strong> <span class="muted">({{ fwd_expires | dt }} хүртэл хүчинтэй)</span>. Энэ кодыг Gmail-ийн тохиргоонд оруулна уу.
+      {% if fwd_link %}Gmail баталгаажуулах холбоос илгээсэн: <a class="btn btn-primary btn-sm" href="{{ fwd_link }}" target="_blank" rel="noopener noreferrer">Gmail дамжуулалтыг баталгаажуулах</a> <span class="muted">({{ fwd_expires | dt }} хүртэл)</span>. Gmail-д нэвтэрсэн хөтчөөрөө дарна уу.
+      {% elif fwd_code %}Gmail-ээс ирсэн код: <strong class="code tabular">{{ fwd_code }}</strong> <span class="muted">({{ fwd_expires | dt }} хүртэл хүчинтэй)</span>. Энэ кодыг Gmail-ийн тохиргоонд оруулна уу.
       {% else %}Gmail баталгаажуулах имэйл илгээсний дараа код энд харагдана. Хуудас өөрөө шинэчлэгдэнэ.{% endif %}</li>
     <li><strong>Шүүлтүүр үүсгэх.</strong> Gmail → Тохиргоо → «Шүүлтүүр» → «Шинэ шүүлтүүр»: From = {{ bank_senders | join(", ") }}. «Дамжуулах» сонголтоор дээрх хаягийг сонгоно. Зөвхөн банкны гүйлгээний мэдэгдэл дамжуулна уу. <span class="placeholder">[зураг]</span></li>
     <li><strong>Шалгах.</strong> Доорх товчоор туршилтын мэдэгдэл илгээж, кассын дэлгэц дээр харагдаж байгааг шалгана.

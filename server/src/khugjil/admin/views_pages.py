@@ -33,6 +33,7 @@ from khugjil.db.models import (
     Transaction,
 )
 from khugjil.delivery.format import build_notification
+from khugjil.ingest.forwarding import CONFIRM_LINK
 from khugjil.ingest.pipeline import ALERT_FORWARDING_SILENT, ALERT_TEMPLATE_CHANGED
 from khugjil.ingest.reasons import Reason
 from khugjil.services.provisioning import (
@@ -396,9 +397,12 @@ async def _email_state(ctx: Any) -> dict[str, Any]:
         if fwd
         else None
     )
+    # Either a numeric code or (current Gmail) Google's confirmation link for the owner to open.
+    link = code if code and CONFIRM_LINK.fullmatch(code) else None
     return {
         "address": f"{address_local}@{ctx.rt.settings.inbound_domain}" if address_local else None,
-        "fwd_code": code,
+        "fwd_code": code if code and code.isdigit() else None,
+        "fwd_link": link,
         "fwd_expires": fwd.expires_at if fwd else None,
         "events": [
             (e.received_at, REASON_LABELS.get(Reason(e.reason_code), e.reason_code)) for e in events

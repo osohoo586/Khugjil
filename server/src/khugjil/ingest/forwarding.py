@@ -1,9 +1,11 @@
 """Gmail forwarding-confirmation mail (between checks a and b).
 
-Only the numeric confirmation code is extracted. Gmail's confirmation must carry Google's DKIM
-signature (d=google.com) first; then the code is taken from the subject ("(#123456789) …", in
-whatever language the Gmail account uses) or, failing that, from a 9-digit number in the text.
-No link is read, stored or followed, and nothing but the digits leaves this module. A message from
+Gmail's confirmation must carry Google's DKIM signature (d=google.com) first. Then the numeric
+code is taken from the subject ("(#123456789) …", in any language) or from a 9-digit number in the
+text. Current Gmail confirmations carry no code, only a confirmation link: then the first
+``https://mail.google.com/…`` or ``https://mail-settings.google.com/…`` link is kept so the OWNER
+can open it from the email page. The service itself never opens it (no link following), and no
+other link or text leaves this module. A message from
 Gmail's forwarding sender that cannot be used is dropped with its own reason code, so the owner
 can see on the email page that the confirmation arrived but was not recognised.
 """
@@ -23,6 +25,10 @@ FORWARDING_SENDER = "forwarding-noreply@google.com"
 _SUBJECT_CODE = re.compile(r"\(#(?P<code>\d{6,12})\)")
 _BODY_CODE = re.compile(r"(?<!\d)(?P<code>\d{9})(?!\d)")
 _TAG = re.compile(r"<[^>]*>")
+# Google's own confirmation endpoints only; anything else is never kept.
+CONFIRM_LINK = re.compile(
+    r"https://mail(?:-settings)?\.google\.com/[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]{1,1900}"
+)
 MAX_BODY_CHARS = 20_000
 
 
@@ -67,6 +73,9 @@ def confirmation_code(msg: EmailMessage, raw: bytes, dnsfunc: DnsFunc) -> str | 
     body = _body_text(msg)
     m = _SUBJECT_CODE.search(subject) or _BODY_CODE.search(body)
     if m is None:
+        link = CONFIRM_LINK.search(body)
+        if link is not None:
+            return link.group(0)
         get_logger().info(
             "ingest.fwd_confirm_shape", fwd_shape=shape(msg), fwd_digits=digit_runs(subject, body)
         )
