@@ -1,10 +1,11 @@
 """Gmail forwarding-confirmation mail (between checks a and b).
 
-Only the numeric confirmation code is extracted, from the DKIM-signed subject ("(#123456789) …",
-in whatever language the Gmail account uses). The body is never read, so a plain-text or a
-text+HTML message both work; no link is read, stored or followed. A message from Gmail's
-forwarding sender that cannot be used is dropped with its own reason code, so the owner can see
-on the email page that the confirmation arrived but was not recognised.
+Only the numeric confirmation code is extracted. Gmail's confirmation must carry Google's DKIM
+signature (d=google.com) first; then the code is taken from the subject ("(#123456789) …", in
+whatever language the Gmail account uses) or, failing that, from a 9-digit number in the text.
+No link is read, stored or followed, and nothing but the digits leaves this module. A message from
+Gmail's forwarding sender that cannot be used is dropped with its own reason code, so the owner
+can see on the email page that the confirmation arrived but was not recognised.
 """
 
 from __future__ import annotations
@@ -18,8 +19,10 @@ from khugjil.ingest.reasons import Reason
 from khugjil.ingest.sanitize import clean_text
 
 FORWARDING_SENDER = "forwarding-noreply@google.com"
-_SUBJECT = re.compile(r"\(#(?P<code>\d{6,12})\)\s")
-_TEXT_TYPES = frozenset({"text/plain", "text/html"})
+_SUBJECT_CODE = re.compile(r"\(#(?P<code>\d{6,12})\)")
+_BODY_CODE = re.compile(r"(?<!\d)(?P<code>\d{9})(?!\d)")
+_TAG = re.compile(r"<[^>]*>")
+MAX_BODY_CHARS = 20_000
 
 
 def sender_address(msg: EmailMessage) -> str | None:
@@ -32,24 +35,22 @@ def sender_address(msg: EmailMessage) -> str | None:
     return addrs[0].strip().lower()
 
 
-def _text_only(msg: EmailMessage) -> bool:
-    """Plain text, or text+HTML alternatives; nothing else, no attachments."""
-    if not msg.is_multipart():
-        return msg.get_content_type() in _TEXT_TYPES
-    if msg.get_content_type() != "multipart/alternative":
-        return False
-    parts = msg.get_payload()
-    return (
-        isinstance(parts, list)
-        and bool(parts)
-        and all(
-            isinstance(p, EmailMessage)
-            and not p.is_multipart()
-            and p.get_content_type() in _TEXT_TYPES
-            and p.get_content_disposition() is None
-            for p in parts
-        )
-    )
+def _body_text(msg: EmailMessage) -> str:
+    """The text parts (HTML with tags removed), capped; used only to find the digits."""
+    out: list[str] = []
+    for part in msg.walk():
+        if part.is_multipart() or part.get_content_maintype() != "text":
+            continue
+        try:
+            text = str(part.get_content())
+        except (LookupError, ValueError):
+            continue
+        if part.get_content_subtype() == "html":
+            text = _TAG.sub(" ", text)
+        out.append(text)
+        if sum(len(t) for t in out) > MAX_BODY_CHARS:
+            break
+    return " ".join(out)[:MAX_BODY_CHARS]
 
 
 def confirmation_code(msg: EmailMessage, raw: bytes, dnsfunc: DnsFunc) -> str | Reason | None:
@@ -59,9 +60,9 @@ def confirmation_code(msg: EmailMessage, raw: bytes, dnsfunc: DnsFunc) -> str | 
         return None
     if len(msg.get_all("Subject") or []) != 1:
         return Reason.FWD_CONFIRM_UNRECOGNIZED
-    m = _SUBJECT.match(clean_text(str(msg["Subject"])))
-    if m is None or not _text_only(msg):
-        return Reason.FWD_CONFIRM_UNRECOGNIZED
     if not dkim_pass(raw, ("google.com",), dnsfunc):
         return Reason.FWD_CONFIRM_AUTH_FAIL
-    return m.group("code")
+    m = _SUBJECT_CODE.search(clean_text(str(msg["Subject"])))
+    if m is None:
+        m = _BODY_CODE.search(_body_text(msg))
+    return m.group("code") if m else Reason.FWD_CONFIRM_UNRECOGNIZED

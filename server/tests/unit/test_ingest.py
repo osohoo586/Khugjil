@@ -50,9 +50,27 @@ def test_forwarding_confirmation_requires_google_dkim(mailer: Mailer) -> None:
     assert r.reason == Reason.FWD_CONFIRM_AUTH_FAIL
 
 
-def test_forwarding_confirmation_subject_needs_the_code(mailer: Mailer) -> None:
+def test_forwarding_confirmation_code_from_the_text_when_the_subject_has_none(
+    mailer: Mailer,
+) -> None:
     raw = forwarding_confirmation().replace(b"(#123456789) ", b"")
     r = evaluate(_google_signed(mailer, raw), mailer)
+    assert isinstance(r, ForwardingCode)
+    assert r.code.reveal() == "123456789"
+
+
+def test_forwarding_confirmation_without_any_code(mailer: Mailer) -> None:
+    from email.message import EmailMessage
+    from email.policy import SMTP
+
+    msg = EmailMessage()
+    msg["From"] = "Gmail Team <forwarding-noreply@google.com>"
+    msg["To"] = "fake@in.khugjil.test"
+    msg["Subject"] = "Gmail notice"
+    msg["Date"] = "Thu, 15 Oct 2026 08:40:00 +0800"
+    msg["Message-ID"] = "<fwd-3@google.com>"
+    msg.set_content("No code here, only 2026 and 12345.\r\n")
+    r = evaluate(_google_signed(mailer, msg.as_bytes(policy=SMTP)), mailer)
     assert isinstance(r, Dropped)
     assert r.reason == Reason.FWD_CONFIRM_UNRECOGNIZED
 
@@ -287,14 +305,13 @@ def test_forwarding_rejects_variants(mailer: Mailer) -> None:
     assert check(base) == "123456789"
     assert check(b"From: x@google.com\r\n" + base) is None  # two senders: not Gmail's
     assert check(b"Subject: again\r\n" + base) == Reason.FWD_CONFIRM_UNRECOGNIZED
+    # The structure does not matter (only Google-signed digits are used): a logo part is fine.
     multi = base.replace(b"Content-Type: text/plain", b"Content-Type: multipart/mixed; boundary=b")
-    assert check(multi) == Reason.FWD_CONFIRM_UNRECOGNIZED
-    empty_alt = base.replace(
-        b"Content-Type: text/plain", b"Content-Type: multipart/alternative; boundary=b"
+    assert check(multi) == "123456789"
+    unsigned = forwarding_confirmation()
+    assert confirmation_code(mime.parse_message(unsigned), unsigned, mailer.dns) == (
+        Reason.FWD_CONFIRM_AUTH_FAIL
     )
-    assert check(empty_alt) == Reason.FWD_CONFIRM_UNRECOGNIZED
-    pdf = base.replace(b"Content-Type: text/plain", b"Content-Type: application/pdf")
-    assert check(pdf) == Reason.FWD_CONFIRM_UNRECOGNIZED
 
 
 def test_message_id_hash_survives_malformed_header() -> None:
