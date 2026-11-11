@@ -120,6 +120,30 @@ async def overview(ctx: Reader) -> HTMLResponse:
                 )
             ).scalars()
         )
+        # Routing needs an account in a shared group: flag set-ups that silently get nothing.
+        groups = list(
+            (
+                await s.execute(
+                    select(RecipientGroup)
+                    .where(RecipientGroup.status == "active")
+                    .order_by(RecipientGroup.name)
+                )
+            ).scalars()
+        )
+        with_accounts = set(
+            await s.scalars(
+                select(GroupAccount.group_id)
+                .join(BankAccount, BankAccount.id == GroupAccount.account_id)
+                .where(BankAccount.status == "active")
+            )
+        )
+        useful = [g.id for g in groups if g.id in with_accounts]
+        members_reached = set(
+            await s.scalars(select(GroupMember.member_id).where(GroupMember.group_id.in_(useful)))
+        )
+        devices_reached = set(
+            await s.scalars(select(DeviceGroup.device_id).where(DeviceGroup.group_id.in_(useful)))
+        )
     problems: list[tuple[str, str]] = []
     for a in alerts:
         if a.kind == ALERT_FORWARDING_SILENT:
@@ -135,6 +159,21 @@ async def overview(ctx: Reader) -> HTMLResponse:
         if m.id not in consenting:
             problems.append(
                 (f"{m.display_name} зөвшөөрөл өгөөгүй тул мэдэгдэл авахгүй.", "/members")
+            )
+    for g in groups:
+        if g.id not in with_accounts:
+            problems.append(
+                (f"«{g.name}» бүлэгт данс холбогдоогүй тул гишүүд нь гүйлгээ харахгүй.", "/groups")
+            )
+    for m in cashiers_without_consent:  # all active cashiers
+        if m.id not in members_reached:
+            problems.append(
+                (f"{m.display_name} данстай бүлэгт ороогүй тул гүйлгээ харахгүй.", "/members")
+            )
+    for d in devices:
+        if d.id not in devices_reached:
+            problems.append(
+                (f"{d.name} төхөөрөмж данстай бүлэгт ороогүй тул гүйлгээ харахгүй.", "/devices")
             )
     if failed:
         problems.append((f"Сүүлийн 24 цагт {failed} мэдэгдэл илгээгдээгүй.", "/devices"))

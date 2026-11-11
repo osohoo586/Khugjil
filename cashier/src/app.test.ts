@@ -101,4 +101,18 @@ describe("CashierApp", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(root.querySelector("h1")?.textContent).toBe("Энэ компьютерийг холбох");
   });
+
+  it("tells the cashier when the shift can see no account", async () => {
+    const root = document.createElement("div");
+    const api = fakeApi({ "/api/v1/device": { ...info, accounts: [] }, "/api/v1/transactions": { items: [] } });
+    await new CashierApp(root, webPlatform(document.createElement("div"), api)).start("/", "");
+    expect(root.querySelector(".notice-error")?.textContent).toContain("Энэ ээлжинд харах данс алга");
+  });
+
+  it("shows no such notice when accounts are visible", async () => {
+    const root = document.createElement("div");
+    const api = fakeApi({ "/api/v1/device": info, "/api/v1/transactions": { items: [] } });
+    await new CashierApp(root, webPlatform(document.createElement("div"), api)).start("/", "");
+    expect(root.querySelector(".notice-error")).toBeNull();
+  });
 });

@@ -502,3 +502,37 @@ async def test_referrer_policy_keeps_same_origin_form_posts_working(admin: ApiHa
     assert refused.status_code == 403  # the guard itself stays strict
     allowed = await admin.client.post("/login", data=data)
     assert allowed.status_code != 403
+
+
+async def test_overview_flags_set_ups_that_receive_nothing(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any
+) -> None:
+    """A group without an account, and a cashier or device only in such a group, get no
+    transactions at all; the overview says so instead of staying silent."""
+    from khugjil.db.models import Device, DeviceGroup, GroupMember, Member, RecipientGroup
+    from khugjil.db.tenancy import tenant_session
+
+    h, _, _ = owner
+    page = (await h.client.get("/")).text
+    assert "данс холбогдоогүй" not in page
+    assert "данстай бүлэгт ороогүй" not in page
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        group = RecipientGroup(tenant_id=world.tenant_id, name="Хоосон бүлэг")
+        member = Member(
+            tenant_id=world.tenant_id, display_name="Д. Дорж", role="cashier", status="active"
+        )
+        device = Device(tenant_id=world.tenant_id, name="Касс-хоосон")
+        s.add_all([group, member, device])
+        await s.flush()
+        s.add_all(
+            [
+                GroupMember(tenant_id=world.tenant_id, group_id=group.id, member_id=member.id),
+                DeviceGroup(tenant_id=world.tenant_id, group_id=group.id, device_id=device.id),
+            ]
+        )
+    page = (await h.client.get("/")).text
+    assert "«Хоосон бүлэг» бүлэгт данс холбогдоогүй тул гишүүд нь гүйлгээ харахгүй." in page
+    assert "Д. Дорж данстай бүлэгт ороогүй тул гүйлгээ харахгүй." in page
+    assert "Касс-хоосон төхөөрөмж данстай бүлэгт ороогүй тул гүйлгээ харахгүй." in page
+    assert "Б. Сараа данстай бүлэгт" not in page  # the world's cashier is reached
+    assert "Касс-1 төхөөрөмж данстай" not in page

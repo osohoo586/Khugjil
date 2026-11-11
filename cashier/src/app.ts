@@ -126,11 +126,16 @@ export class CashierApp {
     this.refs.list = h("div");
     this.refs.footer = h("footer", { class: "totals", hidden: !info.show_today_totals });
     const verify = verifyBox((value, out) => this.onVerifyInput(value, out));
+    // No account is shared by this device, this cashier and an active group: nothing can arrive.
+    const noAccounts = info.accounts.length === 0
+      ? message("Энэ ээлжинд харах данс алга тул гүйлгээ ирэхгүй. Админ «Бүлгүүд» хуудаснаас таны бүлэгт данс холбоно уу.", "error")
+      : null;
     replace(
       this.root,
       top.el,
       this.refs.banner,
       this.refs.sound,
+      noAccounts,
       h("main", { class: "grid" }, h("div", { class: "main-hero" }, this.refs.hero), verify, h("div", { class: "main-list" }, this.refs.list)),
       this.refs.footer,
     );
