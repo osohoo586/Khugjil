@@ -13,6 +13,8 @@ export interface Txn {
   datetime_text: string;
   account_alias: string | null;
   test: boolean;
+  /** Reached the server long after the bank made it (forwarding was down): list it, never announce it. */
+  late?: boolean;
 }
 
 export interface DeviceInfo {
@@ -23,6 +25,8 @@ export interface DeviceInfo {
   voice_enabled: boolean;
   voice_max_amount: string | null;
   show_today_totals: boolean;
+  /** False: the server opens the shift itself, so there is no PIN screen and no end button. */
+  pin_shifts: boolean;
   multiple_accounts: boolean;
   accounts: string[];
   members: { id: string; display_name: string }[];

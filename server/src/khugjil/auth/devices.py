@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from khugjil.auth.secrets import lockout_until, verify_secret
@@ -300,3 +301,55 @@ async def open_shift(s: AsyncSession, device_id: uuid.UUID) -> Shift | None:
     return (
         await s.execute(select(Shift).where(Shift.device_id == device_id, Shift.ended_at.is_(None)))
     ).scalar_one_or_none()
+
+
+_AUTO_ROLE_ORDER = {"owner": 0, "admin": 1}
+
+
+async def ensure_auto_shift(
+    s: AsyncSession, tenant: Tenant, device_id: uuid.UUID, now: datetime
+) -> Shift | None:
+    """The device's open shift; without PIN shifts (tenant.cashier_pin_shifts false) open one.
+
+    The member is the first active owner, then admin, who shares an active group with the device
+    and has an active web consent, so the delivery gate (consent, duty, groups) is unchanged.
+    """
+    shift = await open_shift(s, device_id)
+    if shift is not None or tenant.cashier_pin_shifts:
+        return shift
+    rows = await s.execute(
+        select(Member)
+        .join(GroupMember, GroupMember.member_id == Member.id)
+        .join(DeviceGroup, DeviceGroup.group_id == GroupMember.group_id)
+        .join(RecipientGroup, RecipientGroup.id == GroupMember.group_id)
+        .where(
+            DeviceGroup.device_id == device_id,
+            RecipientGroup.status == "active",
+            Member.status == "active",
+            Member.role.in_(_AUTO_ROLE_ORDER),
+        )
+        .distinct()
+    )
+    members = sorted(rows.scalars(), key=lambda m: (_AUTO_ROLE_ORDER[m.role], m.created_at))
+    for member in members:
+        consents = (
+            await s.execute(
+                select(Consent).where(Consent.member_id == member.id, Consent.channel == "web")
+            )
+        ).scalars()
+        from khugjil.routing.model import ConsentState
+
+        states = [ConsentState(c.version, "web", c.revoked_at is not None) for c in consents]
+        if not consent_active(states, "web", tenant.min_consent_version):
+            continue
+        try:
+            async with s.begin_nested():
+                shift = Shift(
+                    tenant_id=tenant.id, device_id=device_id, member_id=member.id,
+                    started_at=now, last_activity_at=now,
+                )  # fmt: skip
+                s.add(shift)
+        except IntegrityError:  # a concurrent request opened it first
+            return await open_shift(s, device_id)
+        return shift
+    return None

@@ -77,7 +77,10 @@ async def create_session(
     return token
 
 
-async def load_session(sm: SessionMaker, token: str, now: datetime) -> AdminSession | None:
+async def load_session(
+    sm: SessionMaker, token: str, now: datetime, *, touch: bool = True
+) -> AdminSession | None:
+    """touch=False for background polls, so an open page does not defeat the idle timeout."""
     found = await Resolver(sm).session_token(token_hash(token))
     if found is None:
         return None
@@ -88,7 +91,8 @@ async def load_session(sm: SessionMaker, token: str, now: datetime) -> AdminSess
             if row is not None:
                 await s.delete(row)
             return None
-        row.last_seen_at = now
+        if touch:
+            row.last_seen_at = now
         stepped = row.stepup_at is not None and row.stepup_at > now - STEPUP_VALID
     return AdminSession(tenant_id, member_id, session_id, token, stepped)
 

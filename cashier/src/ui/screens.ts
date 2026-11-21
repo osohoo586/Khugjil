@@ -1,7 +1,8 @@
-import type { DeviceInfo, Txn } from "../api";
-import { h, replace } from "../dom";
-import { clock, relativeTime } from "../format";
+import type { DeviceInfo } from "../api";
+import { h } from "../dom";
+import { clock } from "../format";
 
+/** Items kept in memory (and fetched after a reconnect); the feed shows FEED_LIMIT of them. */
 export const LIST_LIMIT = 10;
 export const HIGHLIGHT_MS = 10_000;
 
@@ -16,93 +17,14 @@ export function topBar(
 ): { el: HTMLElement; status: HTMLElement; clockEl: HTMLElement } {
   const name = info.accounts.length ? info.accounts.join(" · ") : info.tenant_name;
   const status = h("span", { class: "status ok" }, "Холбогдсон");
-  const clockEl = h("span", { class: "tabular" }, clock(now));
+  const clockEl = h("span", { class: "top-clock" }, clock(now));
   const right = h("div", { class: "top-right" });
-  if (info.shift) right.append(h("span", { class: "who" }, info.shift.display_name));
+  // With PIN shifts the member on duty matters; without, the device name adds nothing.
+  if (info.shift && info.pin_shifts) right.append(h("span", { class: "who" }, info.shift.display_name));
   right.append(clockEl);
   if (onEnd) right.append(h("button", { type: "button", class: "btn btn-secondary", onclick: onEnd }, "Ээлж дуусгах"));
   const el = h("header", { class: "top" }, h("span", { class: "shop" }, name), status, right);
   return { el, status, clockEl };
-}
-
-export function hero(latest: Txn | null, showAlias: boolean, now: Date, highlight: boolean): HTMLElement {
-  if (!latest) {
-    return h(
-      "section",
-      { class: "hero", "aria-label": "Сүүлийн орлого" },
-      h("p", { class: "hero-label" }, "Сүүлийн орлого"),
-      h("p", { class: "hero-empty" }, "Ээлж эхэлснээс хойш орлого ороогүй байна."),
-    );
-  }
-  return h(
-    "section",
-    { class: highlight ? "hero new" : "hero", "aria-label": "Сүүлийн орлого" },
-    h("p", { class: "hero-label" }, "Сүүлийн орлого"),
-    h("p", { class: "hero-amount tabular" }, latest.amount_text),
-    h("p", { class: "hero-desc" }, latest.description),
-    h(
-      "p",
-      { class: "hero-time" },
-      `${latest.time_text} · ${relativeTime(new Date(latest.txn_at), now)}`,
-      showAlias && latest.account_alias ? ` · ${latest.account_alias}` : "",
-    ),
-  );
-}
-
-export function txnList(items: Txn[], showAccount: boolean): HTMLElement {
-  if (items.length === 0) {
-    return h("section", { class: "list" }, h("p", { class: "muted" }, "Жагсаалт хоосон байна. Шинэ орлого энд харагдана."));
-  }
-  const head = h("tr", {}, h("th", {}, "Цаг"), h("th", { class: "num" }, "Дүн"), h("th", {}, "Утга"));
-  if (showAccount) head.append(h("th", {}, "Данс"));
-  const body = h("tbody");
-  for (const t of items.slice(0, LIST_LIMIT)) {
-    const row = h(
-      "tr",
-      {},
-      h("td", { class: "tabular" }, t.time_text),
-      h("td", { class: "num tabular" }, t.amount_text),
-      h("td", { class: "truncate", title: t.description }, t.description),
-    );
-    if (showAccount) row.append(h("td", { class: "acct", title: t.account_alias ?? "" }, t.account_alias ?? ""));
-    body.append(row);
-  }
-  return h("section", { class: "list" }, h("table", { class: "table" }, h("thead", {}, head), body));
-}
-
-export function verifyBox(onInput: (value: string, out: HTMLElement) => void): HTMLElement {
-  const out = h("p", { class: "verify-result", "aria-live": "polite" });
-  const input = h("input", {
-    id: "verify",
-    inputmode: "decimal",
-    autocomplete: "off",
-    placeholder: "Жишээ нь 2800",
-    oninput: (e: Event) => onInput((e.target as HTMLInputElement).value, out),
-  });
-  return h(
-    "section",
-    { class: "verify" },
-    h("label", { for: "verify", class: "verify-label" }, "Дүнгээр шалгах"),
-    input,
-    out,
-  );
-}
-
-export function verifyResult(out: HTMLElement, matches: Txn[] | null, error: string | null): void {
-  if (error) {
-    replace(out, error);
-    out.className = "verify-result error";
-  } else if (matches === null) {
-    replace(out, "Шалгаж байна…");
-    out.className = "verify-result muted";
-  } else if (matches.length) {
-    const first = matches[0] as Txn;
-    replace(out, `Орсон байна — ${first.time_text}, ${first.description}`);
-    out.className = "verify-result ok";
-  } else {
-    replace(out, "Сүүлийн 15 минутад ийм дүнтэй орлого ороогүй байна");
-    out.className = "verify-result none";
-  }
 }
 
 export function shiftStart(

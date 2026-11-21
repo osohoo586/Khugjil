@@ -5,7 +5,7 @@ const NOW = new Date("2026-10-15T00:40:00Z");
 
 const info = {
   device_name: "Касс-1", tenant_name: "Жишээ ХХК", accent: "green", toast_seconds: 20,
-  voice_enabled: false, voice_max_amount: null, show_today_totals: true, multiple_accounts: true,
+  voice_enabled: false, voice_max_amount: null, show_today_totals: true, pin_shifts: false, multiple_accounts: true,
   accounts: ["Төв дэлгүүр", "Салбар-2"], members: [{ id: "m1", display_name: "Б. Сараа" }],
   shift: { id: "s1", member_id: "m1", display_name: "Б. Сараа", started_at: "2026-10-15T00:00:00Z" },
   vapid_public_key: null,
@@ -14,7 +14,9 @@ const info = {
 function txn(seq: number, amount_text: string, description: string, time: string, alias: string) {
   return {
     id: `t${seq}`, seq, amount: "0", currency: "MNT", amount_text, description,
-    txn_at: `2026-10-15T00:${time.slice(3)}:00Z`, time_text: time, datetime_text: `2026.10.15 ${time}`,
+    // time is Ulaanbaatar (UTC+8) local time
+    txn_at: new Date(Date.UTC(2026, 9, 15, Number(time.slice(0, 2)) - 8, Number(time.slice(3)))).toISOString(),
+    time_text: time, datetime_text: `2026.10.15 ${time}`,
     account_alias: alias, test: false,
   };
 }
@@ -29,10 +31,9 @@ const items = [
 
 async function mockApi(page: Page, opts: { shift?: boolean; events?: { type: string; data: string }[] } = {}) {
   await page.clock.install({ time: NOW });
-  await page.route("**/api/v1/device", (r) => r.fulfill({ json: opts.shift === false ? { ...info, shift: null } : info }));
+  await page.route("**/api/v1/device", (r) => r.fulfill({ json: opts.shift === false ? { ...info, pin_shifts: true, shift: null } : info }));
   await page.route("**/api/v1/transactions*", (r) => r.fulfill({ json: { items } }));
   await page.route("**/api/v1/summary/today", (r) => r.fulfill({ json: { count: 14, total_text: "312,500 ₮" } }));
-  await page.route("**/api/v1/verify*", (r) => r.fulfill({ json: { matches: [items[0]] } }));
   await page.route("**/api/v1/transactions/*/ack", (r) => r.fulfill({ json: { acked: true } }));
   await page.route("**/voice/manifest.json", (r) => r.fulfill({ status: 404 }));
   await page.addInitScript((events: { type: string; data: string }[]) => {
@@ -60,8 +61,8 @@ test("cashier full layout (>= 1024 px)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await mockApi(page);
   await page.goto(BASE);
-  await page.locator("#verify").fill("2800");
-  await expect(page.locator(".verify-result")).toHaveText("Орсон байна — 08:37, Худалдан авалт");
+  await expect(page.locator(".row.latest .row-amount")).toHaveText("2,800 ₮");
+  await expect(page.locator(".row")).toHaveCount(5);
   await expect(page).toHaveScreenshot("cashier-full.png");
 });
 
@@ -69,7 +70,7 @@ test("cashier compact layout (docked, 420 px)", async ({ page }) => {
   await page.setViewportSize({ width: 420, height: 900 });
   await mockApi(page);
   await page.goto(BASE);
-  await expect(page.locator(".hero-amount")).toHaveText("2,800 ₮");
+  await expect(page.locator(".row.latest .row-amount")).toHaveText("2,800 ₮");
   await expect(page).toHaveScreenshot("cashier-compact.png");
 });
 
@@ -77,7 +78,7 @@ test("cashier phone layout (PWA)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockApi(page);
   await page.goto(BASE);
-  await expect(page.locator(".hero-amount")).toBeVisible();
+  await expect(page.locator(".row.latest .row-amount")).toBeVisible();
   await expect(page).toHaveScreenshot("cashier-phone.png");
 });
 
@@ -98,6 +99,10 @@ test("toast, hostile description as text, then disconnected banner after 5 s", a
   await expect(toast).toContainText("45,000 ₮");
   await expect(page.locator(".toast img")).toHaveCount(0);
   await expect(toast).toHaveScreenshot("toast.png");
+  // The new income is on top of the feed, highlighted; the oldest of the five dropped off.
+  await expect(page.locator(".row.latest.new .row-amount")).toHaveText("45,000 ₮");
+  await expect(page.locator(".row")).toHaveCount(5);
+  await expect(page.locator(".feed")).toHaveScreenshot("cashier-new-income.png");
   await page.clock.fastForward(6000);
   await expect(page.locator(".banner-error")).toBeVisible();
 });

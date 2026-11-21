@@ -42,6 +42,7 @@ from khugjil.services.provisioning import (
     current_inbound,
     rotate_inbound,
 )
+from khugjil.services.shifts import end_open_shifts
 from khugjil.settings import BANK_TZ
 
 router = APIRouter()
@@ -99,13 +100,6 @@ async def overview(ctx: Reader) -> HTMLResponse:
             .select_from(Delivery)
             .where(Delivery.status == "failed", Delivery.created_at > now - timedelta(hours=24))
         )
-        count, total = (
-            await s.execute(
-                select(func.count(), func.coalesce(func.sum(Transaction.amount), 0)).where(
-                    Transaction.txn_at >= local_day_start(now), Transaction.currency == "MNT"
-                )
-            )
-        ).one()
         alerts = list((await s.execute(select(Alert).where(Alert.resolved_at.is_(None)))).scalars())
         pending = list(
             (
@@ -183,16 +177,38 @@ async def overview(ctx: Reader) -> HTMLResponse:
         problems.append((f"Сүүлийн 24 цагт {failed} мэдэгдэл илгээгдээгүй.", "/devices"))
     return ctx.render(
         "overview.html",
+        **await _overview_live_state(ctx),
         last_ok=last_ok,
         forwarding_ok=not any(a.kind == ALERT_FORWARDING_SILENT for a in alerts),
         devices_online=sum(online(d, now) for d in devices),
         devices_total=len(devices),
         offline_names=[d.name for d in devices if not online(d, now)][:3],
         failed=failed or 0,
-        today_count=count,
-        today_total=Decimal(total),
         problems=problems,
     )
+
+
+RECENT_LIMIT = 5
+
+
+async def _overview_live_state(ctx: Reader) -> dict[str, Any]:
+    """Today's totals and the latest incomes, the same ones the cashier screen shows."""
+    now = utcnow()
+    async with ctx.session() as s:
+        count, total = (
+            await s.execute(
+                select(func.count(), func.coalesce(func.sum(Transaction.amount), 0)).where(
+                    Transaction.txn_at >= local_day_start(now), Transaction.currency == "MNT"
+                )
+            )
+        ).one()
+    recent, _ = await _history_rows(ctx, (None, None, None, None), None, RECENT_LIMIT, 0)
+    return {"today_count": count, "today_total": Decimal(total), "recent": recent}
+
+
+@router.get("/overview/live", response_class=HTMLResponse)
+async def overview_live(ctx: Reader) -> HTMLResponse:
+    return ctx.render("_overview_live.html", **await _overview_live_state(ctx))
 
 
 # ---------------------------------------------------------------- accounts
@@ -242,7 +258,16 @@ async def account_update(
         await ctx.audit(
             s, f"account.{status}", object_type="bank_account", object_id=account_id, label=alias
         )
+    await _refresh_devices(ctx)
     return redirect("/accounts")
+
+
+async def _refresh_devices(ctx: Manager) -> None:
+    """Open cashier pages reload their info at once (accounts, aliases, who may see what)."""
+    async with ctx.session() as s:
+        device_ids = list(await s.scalars(select(Device.id).where(Device.status == "active")))
+    for device_id in device_ids:
+        await ctx.rt.bus.publish(device_id, "settings_changed")
 
 
 # ---------------------------------------------------------------- groups
@@ -361,6 +386,7 @@ async def group_save(
         await ctx.audit(
             s, "group.update", object_type="group", object_id=group_id, label=group.name
         )
+    await _refresh_devices(ctx)
     return redirect("/groups")
 
 
@@ -657,6 +683,7 @@ async def settings_save(
     show_today_totals: Annotated[bool, Form()] = False,
     include_own_transfers: Annotated[bool, Form()] = False,
     auto_add_accounts: Annotated[bool, Form()] = False,
+    cashier_pin_shifts: Annotated[bool, Form()] = False,
 ) -> Response:
     try:
         start, end = time.fromisoformat(business_start), time.fromisoformat(business_end)
@@ -690,8 +717,17 @@ async def settings_save(
         t.voice_enabled, t.voice_max_amount = voice_enabled, voice_max
         t.show_today_totals, t.include_own_transfers = show_today_totals, include_own_transfers
         t.auto_add_accounts = auto_add_accounts
+        pins_turned_on = cashier_pin_shifts and not t.cashier_pin_shifts
+        t.cashier_pin_shifts = cashier_pin_shifts
         await ctx.audit(s, "settings.update", object_type="tenant", object_id=ctx.tenant_id)
         device_ids = list(await s.scalars(select(Device.id).where(Device.status == "active")))
+        ended: list[tuple[uuid.UUID, uuid.UUID]] = []
+        if pins_turned_on:  # shifts opened without a PIN must not outlive the switch
+            now = utcnow()
+            for device_id in device_ids:
+                ended += await end_open_shifts(s, reason="manual", now=now, device_id=device_id)
+    for shift_id, device_id in ended:
+        await ctx.rt.bus.publish(device_id, "shift_ended", shift_id=shift_id)
     for device_id in device_ids:
         await ctx.rt.bus.publish(device_id, "settings_changed")
     return redirect("/settings?saved=1")

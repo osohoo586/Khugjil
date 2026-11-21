@@ -17,7 +17,7 @@ from sqlalchemy import text, update
 from khugjil.api_v1.hooks import cf_signature
 from khugjil.api_v1.stream import sse_events
 from khugjil.auth.devices import DeviceAuth
-from khugjil.db.models import DeviceCredential, Member, Tenant
+from khugjil.db.models import Consent, DeviceCredential, GroupMember, Member, Tenant
 from khugjil.db.tenancy import tenant_session
 from khugjil.services.invites import create_invite
 from tests.fixtures.api import APP, PIN, ApiHarness
@@ -163,6 +163,73 @@ async def test_unknown_member_not_allowed(api: ApiHarness) -> None:
     await api.pair()
     r = await api.start_shift(member_id=uuid.uuid4())
     assert r.json()["error"] == "not_allowed"
+
+
+# ---------------------------------------------------------------- without PIN shifts (2026-11-21)
+
+
+async def _pinless(
+    world: Any, *, role: str = "owner", consent: bool = True, in_group: bool = True
+) -> uuid.UUID:
+    """Switch the tenant to no PIN shifts and add a member the device may open a shift for."""
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        await s.execute(update(Tenant).values(cashier_pin_shifts=False))
+        m = Member(tenant_id=world.tenant_id, display_name="Д. Болд", role=role, status="active")
+        s.add(m)
+        await s.flush()
+        if in_group:
+            s.add(GroupMember(tenant_id=world.tenant_id, group_id=world.group_id, member_id=m.id))
+        if consent:
+            s.add(Consent(tenant_id=world.tenant_id, member_id=m.id, version=1, channel="web"))
+        await s.flush()
+        return m.id
+
+
+async def test_without_pin_shifts_the_device_opens_its_own_shift(
+    api: ApiHarness, world: Any, mailer: Mailer
+) -> None:
+    earlier = await world.ingest(mailer.bank_mail())
+    assert earlier.transaction_id is not None
+    owner_id = await _pinless(world)
+    await api.pair()
+    info = (await api.client.get("/api/v1/device")).json()
+    assert info["pin_shifts"] is False
+    assert info["shift"]["member_id"] == str(owner_id)  # the owner, never the PIN cashier
+    assert info["accounts"] == ["Төв дэлгүүр"]
+    again = (await api.client.get("/api/v1/device")).json()
+    assert again["shift"]["id"] == info["shift"]["id"]
+    # History is the last items, not only those since the shift began.
+    items = (await api.client.get("/api/v1/transactions")).json()["items"]
+    assert [i["amount_text"] for i in items] == ["2,800 ₮"]
+    # Ending it (an old agent, say) just opens a new one on the next load.
+    assert (await api.client.post("/api/v1/shift/end")).json() == {"ended": 1}
+    fresh = (await api.client.get("/api/v1/device")).json()
+    assert fresh["shift"]["id"] != info["shift"]["id"]
+
+
+async def test_without_pin_shifts_the_delivery_gate_still_applies(
+    api: ApiHarness, world: Any
+) -> None:
+    """No consent, no shared group or only a cashier: no shift, so nothing can be delivered."""
+    await _pinless(world, consent=False)
+    await _pinless(world, in_group=False)
+    await _pinless(world, role="viewer")
+    await api.pair()
+    info = (await api.client.get("/api/v1/device")).json()
+    assert info["shift"] is None
+    assert (await api.client.get("/api/v1/transactions")).json()["error"] == "no_shift"
+
+
+async def test_admin_prefers_owner_and_pin_mode_opens_nothing(api: ApiHarness, world: Any) -> None:
+    admin_id = await _pinless(world, role="admin")
+    await api.pair()
+    assert (await api.client.get("/api/v1/device")).json()["shift"]["member_id"] == str(admin_id)
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        await s.execute(update(Tenant).values(cashier_pin_shifts=True))
+    await api.client.post("/api/v1/shift/end")
+    info = (await api.client.get("/api/v1/device")).json()
+    assert info["pin_shifts"] is True
+    assert info["shift"] is None
 
 
 # ---------------------------------------------------------------- transactions

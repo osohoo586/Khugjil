@@ -25,48 +25,44 @@ input, select { font: inherit; font-size: var(--fs-md); min-height: var(--hit); 
 .notice-error { border-left-color: var(--error); background: var(--error-tint); }
 .doc { white-space: pre-wrap; font-family: inherit; background: var(--bg-subtle); border: var(--border-w) solid var(--border); border-radius: var(--radius); padding: var(--sp-2); max-height: 40vh; overflow: auto; }
 
-/* Top bar */
-.top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-bottom: var(--border-w) solid var(--border); min-height: 56px; }
-.shop { font-weight: var(--fw-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status { justify-self: center; font-weight: var(--fw-medium); }
+/* Top bar: shop, connection, clock. Quiet, so the incomes below carry the screen. */
+.top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3); border-bottom: var(--border-w) solid var(--border); min-height: 64px; }
+.shop { font-size: var(--fs-md); font-weight: var(--fw-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { justify-self: center; display: inline-flex; align-items: center; gap: var(--sp-1); font-weight: var(--fw-medium); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .status.ok { color: var(--success); }
 .status.bad { color: var(--error); }
+.status.wait { color: var(--text-muted); }
 .top-right { justify-self: end; display: flex; gap: var(--sp-2); align-items: center; }
+.top-clock { font-size: var(--fs-lg); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; }
 .who { font-weight: var(--fw-medium); }
 
 /* Banners */
-.banner { display: block; width: 100%; padding: var(--sp-1) var(--sp-2); font: inherit; font-weight: var(--fw-semibold); text-align: center; border: none; }
+.banner { display: block; width: 100%; padding: var(--sp-1) var(--sp-2); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-semibold); text-align: center; border: none; }
 .banner[hidden] { display: none; }
 .banner-error { background: var(--error); color: #fff; }
 .banner-sound { background: var(--warning-tint); color: var(--warning); border-bottom: var(--border-w) solid var(--warning); cursor: pointer; min-height: var(--hit); }
 
-/* Main grid */
-.grid { display: grid; gap: var(--sp-2); padding: var(--sp-2); grid-template-columns: 1fr 340px; grid-template-areas: "hero verify" "list list"; }
-.main-hero { grid-area: hero; }
-.verify { grid-area: verify; border: var(--border-w) solid var(--border); border-radius: var(--radius); padding: var(--sp-2); }
-.main-list { grid-area: list; }
-.hero { border: var(--border-w) solid var(--border); border-radius: var(--radius); padding: var(--sp-3); transition: background-color var(--motion) ease-out; }
-.hero.new { background: var(--accent-tint); border-color: var(--accent); }
-.hero-label { font-size: var(--fs-xs); color: var(--text-muted); }
-.hero-amount { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); line-height: var(--lh-tight); margin: var(--sp-1) 0; }
-.hero-desc { font-size: var(--fs-md); overflow-wrap: anywhere; }
-.hero-time { color: var(--text-muted); margin-top: var(--sp-0); }
-.hero-empty { color: var(--text-muted); margin-top: var(--sp-1); }
-.verify-label { font-weight: var(--fw-semibold); display: block; margin-bottom: var(--sp-1); }
-.verify-result { margin-top: var(--sp-1); min-height: 1.5em; overflow-wrap: anywhere; }
-.verify-result.ok { color: var(--success); font-weight: var(--fw-medium); }
-.verify-result.none { color: var(--text); }
-.verify-result.error { color: var(--error); }
-.table { width: 100%; border-collapse: collapse; border: var(--border-w) solid var(--border); border-radius: var(--radius); }
-.table th { text-align: left; font-weight: var(--fw-medium); color: var(--text-muted); font-size: var(--fs-xs); background: var(--bg-subtle); }
-.table th, .table td { padding: var(--sp-1) var(--sp-2); border-bottom: var(--border-w) solid var(--border); }
-.table th.num, .table td.num { text-align: right; }
-.truncate { max-width: 1px; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.table td.num, .table td.tabular { white-space: nowrap; }
-.table td.acct { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body[data-layout="compact"] .table td.acct { max-width: 88px; }
-.status.wait { color: var(--text-muted); }
-.totals { padding: var(--sp-1) var(--sp-2); border-top: var(--border-w) solid var(--border); color: var(--text-muted); }
+/* Feed: the last five incomes. Time | description | amount, newest first and largest. */
+.feed { max-width: 1120px; margin: 0 auto; padding: var(--sp-3); }
+.feed-list { list-style: none; margin: 0; padding: 0; border: var(--border-w) solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.feed-list[hidden], .feed-empty[hidden] { display: none; }
+.feed-empty { padding: var(--sp-5) var(--sp-3); text-align: center; font-size: var(--fs-lg); color: var(--text-muted); border: var(--border-w) dashed var(--border); border-radius: var(--radius); }
+.row { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; grid-template-areas: "when what amount"; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-top: var(--border-w) solid var(--border); border-left: 4px solid transparent; transition: background-color 1200ms ease-out, border-color 1200ms ease-out; }
+.row:first-child { border-top: none; }
+.row-when { grid-area: when; display: flex; flex-direction: column; }
+.row-time { font-size: var(--fs-lg); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; line-height: var(--lh-tight); }
+.row-ago { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-0); white-space: nowrap; }
+.row-what { grid-area: what; min-width: 0; }
+.row-desc { font-size: var(--fs-lg); line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.row-alias { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-amount { grid-area: amount; justify-self: end; text-align: right; font-size: var(--fs-xl); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; line-height: var(--lh-tight); white-space: nowrap; }
+.row.latest { padding-top: var(--sp-3); padding-bottom: var(--sp-3); }
+.row.latest .row-time { font-size: var(--fs-xl); }
+.row.latest .row-desc { font-size: var(--fs-xl); font-weight: var(--fw-medium); }
+.row.latest .row-amount { font-size: var(--fs-2xl); }
+.row.new { background: var(--accent-tint); border-left-color: var(--accent); }
+.totals { max-width: 1120px; margin: 0 auto; padding: 0 var(--sp-3) var(--sp-3); font-size: var(--fs-md); color: var(--text-muted); }
 
 /* Toasts: 360x112, bottom-right, 16px margin, 4px accent bar, progress line. */
 .toasts { position: fixed; right: var(--sp-2); bottom: var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-1); align-items: flex-end; z-index: 50; }
@@ -84,19 +80,29 @@ body[data-layout="compact"] .table td.acct { max-width: 88px; }
 @media (prefers-reduced-motion: reduce) {
   .toast { animation: none; }
   .toast-progress { animation-name: none; }
-  .hero { transition: none; }
+  .row { transition: none; }
 }
 
-/* Medium (481-1023 px) and compact (<= 480 px): verify box first, then hero, then list. */
-body[data-layout="medium"] .grid, body[data-layout="compact"] .grid { grid-template-columns: 1fr; grid-template-areas: "verify" "hero" "list"; }
-body[data-layout="compact"] .top { grid-template-columns: 1fr auto; grid-template-areas: "shop status" "right right"; }
-body[data-layout="compact"] .shop { grid-area: shop; }
-body[data-layout="compact"] .status { grid-area: status; justify-self: end; }
-body[data-layout="compact"] .top-right { grid-area: right; justify-self: stretch; justify-content: space-between; }
-body[data-layout="compact"] .grid { padding: var(--sp-1); gap: var(--sp-1); }
-body[data-layout="compact"] .hero { padding: var(--sp-2); }
-body[data-layout="compact"] .hero-amount { font-size: var(--fs-xl); }
-body[data-layout="compact"] .table th, body[data-layout="compact"] .table td { padding: var(--sp-0) var(--sp-1); }
+/* Medium (481-1023 px): same rows, tighter. */
+body[data-layout="medium"] .feed { padding: var(--sp-2); }
+body[data-layout="medium"] .row { grid-template-columns: 88px minmax(0, 1fr) auto; gap: var(--sp-2); padding: var(--sp-2); }
+
+/* Compact (<= 480 px, docked beside the POS program) and phone: time + amount on one line,
+   the description below at full width. */
+body[data-layout="compact"] .top { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); padding: var(--sp-1) var(--sp-2); min-height: 56px; }
+body[data-layout="compact"] .shop { flex: 1 1 0; min-width: 0; }
+body[data-layout="compact"] .top-clock { font-size: var(--fs-md); }
+body[data-layout="compact"] .feed { padding: var(--sp-1); }
+body[data-layout="compact"] .row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when amount" "what what"; gap: var(--sp-0) var(--sp-2); padding: var(--sp-2); }
+body[data-layout="compact"] .row-when { flex-direction: row; align-items: baseline; gap: var(--sp-1); }
+body[data-layout="compact"] .row-time { font-size: var(--fs-md); }
+body[data-layout="compact"] .row-desc { font-size: 18px; }
+body[data-layout="compact"] .row-amount { font-size: 24px; }
+body[data-layout="compact"] .row.latest { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+body[data-layout="compact"] .row.latest .row-time { font-size: var(--fs-lg); }
+body[data-layout="compact"] .row.latest .row-desc { font-size: 22px; }
+body[data-layout="compact"] .row.latest .row-amount { font-size: 36px; }
+body[data-layout="compact"] .totals { padding: 0 var(--sp-1) var(--sp-2); }
 body[data-layout="compact"] .toasts { left: var(--sp-1); right: var(--sp-1); align-items: stretch; }
 body[data-layout="compact"] .toast { width: auto; }
 

@@ -1,3 +1,6 @@
+calude]
+
+
 # PLAN.md: Khan Bank Income Notifier, Phase 1
 
 > **Status:** draft for approval. No application code has been written.
@@ -36,13 +39,13 @@ caddy :443 --+-- app.<DOMAIN>    static cashier bundle, /api/v1, SSE, /hooks/*  
 
 ### 1.2 Processes and hostnames
 
-| Process | Role | Exposed |
-|---|---|---|
-| `caddy` | Terminates TLS (certificates via TLS-ALPN-01, so port 80 stays closed), serves the cashier bundle, reverse proxy, security headers | 443 |
-| `smtp` | aiosmtpd. Inbound only, never relays. Runs the ingest pipeline in-process. | host 25 → container 2525 (no root, no capabilities) |
-| `api` | FastAPI: cashier JSON API + SSE, admin panel, Telegram webhook, Cloudflare ingest endpoint | internal |
-| `worker` | arq: fan-out, sends, retries, cron jobs | none |
-| `postgres`, `redis` | Data; job queue, pub/sub, rate-limit counters | internal network only |
+| Process                 | Role                                                                                                                               | Exposed                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `caddy`               | Terminates TLS (certificates via TLS-ALPN-01, so port 80 stays closed), serves the cashier bundle, reverse proxy, security headers | 443                                                  |
+| `smtp`                | aiosmtpd. Inbound only, never relays. Runs the ingest pipeline in-process.                                                         | host 25 → container 2525 (no root, no capabilities) |
+| `api`                 | FastAPI: cashier JSON API + SSE, admin panel, Telegram webhook, Cloudflare ingest endpoint                                         | internal                                             |
+| `worker`              | arq: fan-out, sends, retries, cron jobs                                                                                            | none                                                 |
+| `postgres`, `redis` | Data; job queue, pub/sub, rate-limit counters                                                                                      | internal network only                                |
 
 Hostnames (confirm: Q7):
 
@@ -66,18 +69,18 @@ One transport-agnostic function, `ingest(envelope_rcpt, raw_bytes, transport) ->
 
 **Ordered checks.** The first failure stops processing. The only record written is `ingest_event(tenant_id, reason_code, sha256(Message-ID), received_at)`.
 
-| Step | Check | Reason codes |
-|---|---|---|
-| a | Envelope RCPT is an active tenant inbound address | SMTP 550. No event is written because no tenant is known. |
-| — | Gmail forwarding-confirmation branch (below) | `FWD_CONFIRM_STORED` |
-| b | Exactly one `From` header, and its address ∈ `BANK_SENDERS` | `HEADER_DUPLICATE`, `FROM_NOT_ALLOWED` |
-| c | DKIM passes with `d` ∈ `BANK_DKIM_DOMAINS`, OR the ARC chain validates, is sealed by google.com, and records `dkim=pass header.d=<bank domain>` | `AUTH_FAIL` |
-| d | Leaf MIME parts are only `text/plain` or `text/html` (confirm: Q8); raw and decoded size ≤ 256 KB; MIME depth ≤ 5 | `ATTACHMENT`, `TOO_LARGE`, `MIME_INVALID` |
-| e | In this order: deny-list on the subject → subject matches `BANK_SUBJECT_RE` → body matches the `khan_v1` template → deny-list on the body minus the description | `DENYLIST`, `SUBJECT_MISMATCH`, `TEMPLATE_MISMATCH` |
-| f | The Кт account is an active tenant account, and the Дт account is not a tenant account (unless the tenant enabled own transfers, Q35) | `NOT_TENANT_ACCOUNT`, `ACCOUNT_INACTIVE`, `OWN_TRANSFER` |
-| g | Дт amount = Кт amount, same currency, amount > 0 | `AMOUNT_MISMATCH` |
-| — | Idempotency key already exists | `DUPLICATE` |
-| — | Stored | `ACCEPTED` |
+| Step | Check                                                                                                                                                                  | Reason codes                                                   |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| a    | Envelope RCPT is an active tenant inbound address                                                                                                                      | SMTP 550. No event is written because no tenant is known.      |
+| —   | Gmail forwarding-confirmation branch (below)                                                                                                                           | `FWD_CONFIRM_STORED`                                         |
+| b    | Exactly one `From` header, and its address ∈ `BANK_SENDERS`                                                                                                       | `HEADER_DUPLICATE`, `FROM_NOT_ALLOWED`                     |
+| c    | DKIM passes with `d` ∈ `BANK_DKIM_DOMAINS`, OR the ARC chain validates, is sealed by google.com, and records `dkim=pass header.d=<bank domain>`                 | `AUTH_FAIL`                                                  |
+| d    | Leaf MIME parts are only `text/plain` or `text/html` (confirm: Q8); raw and decoded size ≤ 256 KB; MIME depth ≤ 5                                                | `ATTACHMENT`, `TOO_LARGE`, `MIME_INVALID`                |
+| e    | In this order: deny-list on the subject → subject matches `BANK_SUBJECT_RE` → body matches the `khan_v1` template → deny-list on the body minus the description | `DENYLIST`, `SUBJECT_MISMATCH`, `TEMPLATE_MISMATCH`      |
+| f    | The Кт account is an active tenant account, and the Дт account is not a tenant account (unless the tenant enabled own transfers, Q35)                              | `NOT_TENANT_ACCOUNT`, `ACCOUNT_INACTIVE`, `OWN_TRANSFER` |
+| g    | Дт amount = Кт amount, same currency, amount > 0                                                                                                                   | `AMOUNT_MISMATCH`                                            |
+| —   | Idempotency key already exists                                                                                                                                         | `DUPLICATE`                                                  |
+| —   | Stored                                                                                                                                                                 | `ACCEPTED`                                                   |
 
 **DKIM and ARC details**
 
@@ -194,18 +197,18 @@ class Notifier(Protocol):
 
 **Roles** (confirm: Q20)
 
-| Capability | owner | admin | viewer | cashier |
-|---|:-:|:-:|:-:|:-:|
-| Admin panel sign-in (password + TOTP) | ✓ | ✓ | ✓ | – |
-| Тойм, Гүйлгээний түүх | ✓ | ✓ | ✓ | – |
-| CSV export (audit-logged) | ✓ | ✓ | – | – |
-| Accounts, groups, devices, cashiers, settings | ✓ | ✓ | – | – |
-| Manage owners, admins, viewers | ✓ | – | – | – |
-| Имэйл холболт (address, forwarding code, rotation) | ✓ | – | – | – |
-| Service terms | ✓ | – | – | – |
-| Аудит лог | ✓ | ✓ | – | – |
-| Telegram notifications | ✓ | – | – | – |
-| Work a shift on a paired device (PIN) | ✓ | ✓ | – | ✓ |
+| Capability                                                     | owner | admin | viewer | cashier |
+| -------------------------------------------------------------- | :---: | :---: | :----: | :-----: |
+| Admin panel sign-in (password + TOTP)                          |  ✓  |  ✓  |   ✓   |   –   |
+| Тойм, Гүйлгээний түүх                        |  ✓  |  ✓  |   ✓   |   –   |
+| CSV export (audit-logged)                                      |  ✓  |  ✓  |   –   |   –   |
+| Accounts, groups, devices, cashiers, settings                  |  ✓  |  ✓  |   –   |   –   |
+| Manage owners, admins, viewers                                 |  ✓  |  –  |   –   |   –   |
+| Имэйл холболт (address, forwarding code, rotation) |  ✓  |  –  |   –   |   –   |
+| Service terms                                                  |  ✓  |  –  |   –   |   –   |
+| Аудит лог                                              |  ✓  |  ✓  |   –   |   –   |
+| Telegram notifications                                         |  ✓  |  –  |   –   |   –   |
+| Work a shift on a paired device (PIN)                          |  ✓  |  ✓  |   –   |   ✓   |
 
 A tenant always has at least one active owner; this is enforced in code and tested.
 
@@ -254,13 +257,13 @@ A tenant always has at least one active owner; this is enforced in code and test
 
 ### 1.11 Background jobs (arq, Asia/Ulaanbaatar)
 
-| Job | When |
-|---|---|
-| `fanout`, `send` | On demand |
-| Health check: no `ACCEPTED` email for N business hours → owner alert (Q27) | Every 10 min |
-| Shift auto-end (inactivity, scheduled end, end of duty window) | Every minute |
-| Device online state; delivery-failure summary for Тойм | Every minute |
-| Purge: transactions and deliveries past the retention period (Q5), `ingest_event` > 30 d, expired codes, invites and sessions, forwarding codes > 24 h | Hourly |
+| Job                                                                                                                                                      | When         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `fanout`, `send`                                                                                                                                     | On demand    |
+| Health check: no `ACCEPTED` email for N business hours → owner alert (Q27)                                                                            | Every 10 min |
+| Shift auto-end (inactivity, scheduled end, end of duty window)                                                                                           | Every minute |
+| Device online state; delivery-failure summary for Тойм                                                                                               | Every minute |
+| Purge: transactions and deliveries past the retention period (Q5), `ingest_event` > 30 d, expired codes, invites and sessions, forwarding codes > 24 h | Hourly       |
 
 Owner alerts appear in the admin panel and, if linked, in Telegram (Q27).
 
@@ -413,94 +416,94 @@ audit_log                id, tenant_id, actor_kind (member|operator|system), act
 
 **Trust boundaries**
 
-| ID | From → To |
-|---|---|
+| ID  | From → To                                          |
+| --- | --------------------------------------------------- |
 | TB1 | Internet → `smtp`: anyone can connect to port 25 |
-| TB2 | Cloudflare Worker → `/hooks/cf` (fallback only) |
-| TB3 | Cashier browser or PWA → `app.<DOMAIN>` |
-| TB4 | Admin browser → `admin.<DOMAIN>` |
-| TB5 | Telegram → `/hooks/telegram` |
-| TB6 | Server → push services, Telegram API (outbound) |
-| TB7 | App → PostgreSQL and Redis |
-| TB8 | Operator → host (SSH, backups, `.env`) |
+| TB2 | Cloudflare Worker → `/hooks/cf` (fallback only)  |
+| TB3 | Cashier browser or PWA → `app.<DOMAIN>`          |
+| TB4 | Admin browser → `admin.<DOMAIN>`                 |
+| TB5 | Telegram → `/hooks/telegram`                     |
+| TB6 | Server → push services, Telegram API (outbound)    |
+| TB7 | App → PostgreSQL and Redis                         |
+| TB8 | Operator → host (SSH, backups, `.env`)           |
 
 ### 3.2 Threats and mitigations
 
 **S: Spoofing**
 
-| ID | Threat | Mitigation | Verified by |
-|---|---|---|---|
-| S1 | Forged bank email (spoofed `From`) to create a fake "Орлого" | From allowlist + DKIM/ARC (check c); strict template; no `l=`; duplicate headers rejected | Invariant tests 2b, 2c; DKIM fixtures signed with an untrusted key |
-| S2 | Forged ARC headers claiming google.com | Cryptographic ARC verification; only the highest-instance set sealed by google.com is trusted; exact `header.d` match | Fixtures: wrong sealer, broken chain, AAR for another domain, lower-instance spoofed AAR |
-| S3 | A genuine bank email forwarded or replayed by a third party to a leaked inbound address (for example a payer's own debit notice, or an old email) | 120-bit secret address with rotation; check f (Кт must be the tenant's account); idempotency; optional freshness window (Q12) and signed-`To` check (Q13) | Duplicate test; replay tests once Q12/Q13 are decided |
-| S4 | Inbound address guessed | 24 lowercase base32 chars (120 bits); RCPT rate limits; fail2ban | Entropy unit test; rate-limit test |
-| S5 | Forged Cloudflare ingest POST | HMAC-SHA256 over timestamp and body hash; ±300 s window; nonce replay cache in Redis; DKIM is still verified on the raw MIME | Signature, expiry and replay tests |
-| S6 | Forged Telegram webhook | Constant-time `secret_token` header check plus a secret path; updates from unknown chats are ignored | Webhook auth tests |
-| S7 | Stolen or guessed pairing code | Single use, 10 min, tenant-bound; 256-bit QR token carried in the URL fragment; short code limited to 5 attempts; new devices visible and revocable | Pairing tests (expiry, reuse, brute force, other tenant) |
-| S8 | Admin account takeover | argon2id; mandatory TOTP; rate limits; session timeouts; step-up for sensitive actions; audit log | Auth tests |
-| S9 | Someone else starting a shift on a shared PC | PIN works only on a paired device; argon2id; per-member lockout | PIN lockout tests |
-| S10 | Telegram account linked by the wrong person | One-time code that expires and belongs to one member, then an explicit consent button | Link-code tests |
+| ID  | Threat                                                                                                                                            | Mitigation                                                                                                                                                    | Verified by                                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| S1  | Forged bank email (spoofed `From`) to create a fake "Орлого"                                                                              | From allowlist + DKIM/ARC (check c); strict template; no `l=`; duplicate headers rejected                                                                   | Invariant tests 2b, 2c; DKIM fixtures signed with an untrusted key                       |
+| S2  | Forged ARC headers claiming google.com                                                                                                            | Cryptographic ARC verification; only the highest-instance set sealed by google.com is trusted; exact `header.d` match                                       | Fixtures: wrong sealer, broken chain, AAR for another domain, lower-instance spoofed AAR |
+| S3  | A genuine bank email forwarded or replayed by a third party to a leaked inbound address (for example a payer's own debit notice, or an old email) | 120-bit secret address with rotation; check f (Кт must be the tenant's account); idempotency; optional freshness window (Q12) and signed-`To` check (Q13) | Duplicate test; replay tests once Q12/Q13 are decided                                    |
+| S4  | Inbound address guessed                                                                                                                           | 24 lowercase base32 chars (120 bits); RCPT rate limits; fail2ban                                                                                              | Entropy unit test; rate-limit test                                                       |
+| S5  | Forged Cloudflare ingest POST                                                                                                                     | HMAC-SHA256 over timestamp and body hash; ±300 s window; nonce replay cache in Redis; DKIM is still verified on the raw MIME                                 | Signature, expiry and replay tests                                                       |
+| S6  | Forged Telegram webhook                                                                                                                           | Constant-time `secret_token` header check plus a secret path; updates from unknown chats are ignored                                                        | Webhook auth tests                                                                       |
+| S7  | Stolen or guessed pairing code                                                                                                                    | Single use, 10 min, tenant-bound; 256-bit QR token carried in the URL fragment; short code limited to 5 attempts; new devices visible and revocable           | Pairing tests (expiry, reuse, brute force, other tenant)                                 |
+| S8  | Admin account takeover                                                                                                                            | argon2id; mandatory TOTP; rate limits; session timeouts; step-up for sensitive actions; audit log                                                             | Auth tests                                                                               |
+| S9  | Someone else starting a shift on a shared PC                                                                                                      | PIN works only on a paired device; argon2id; per-member lockout                                                                                               | PIN lockout tests                                                                        |
+| S10 | Telegram account linked by the wrong person                                                                                                       | One-time code that expires and belongs to one member, then an explicit consent button                                                                         | Link-code tests                                                                          |
 
 **T: Tampering**
 
-| ID | Threat | Mitigation | Verified by |
-|---|---|---|---|
-| T1 | Label-like text in the description shifts amount or account parsing | Description captured last, between fixed anchors; anchored per-line patterns | Parser tests + hypothesis fuzzing |
-| T2 | HTML or script injection through the description | Plain text everywhere; Jinja autoescape with `|safe` banned; cashier uses `textContent` only; Trusted Types; strict CSP | Jinja render test, vitest DOM test, Playwright with a `<script>` description |
-| T3 | Bidi, zero-width or homoglyph tricks in the description | Cc/Cf/Co stripped; NFC; 200-character cap | Sanitizer tests (RLO, ZWJ, BOM, isolates) |
-| T4 | A description that imitates an amount (for example "1,000,000 ₮ төлсөн") | Amount is visually dominant and the only thing in the amount column; description is labelled and muted | Visual review; Playwright screenshot |
-| T5 | CSV formula injection | Cells starting with `= + - @ \t \r` are prefixed with `'` | CSV export test |
-| T6 | Cross-tenant writes | RLS + composite foreign keys + tenant-scoped session helper | Isolation test suite |
-| T7 | CSRF on admin or cashier endpoints | SameSite=Strict + synchronizer token + Origin check; the JSON API requires `application/json` | CSRF tests per route |
-| T8 | Supply-chain tampering | Locked hashes; pip-audit and npm audit; minimal dependencies; no CDN | CI |
+| ID | Threat                                                                          | Mitigation                                                                                             | Verified by                                                              |
+| -- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| T1 | Label-like text in the description shifts amount or account parsing             | Description captured last, between fixed anchors; anchored per-line patterns                           | Parser tests + hypothesis fuzzing                                        |
+| T2 | HTML or script injection through the description                                | Plain text everywhere; Jinja autoescape with `                                                         | safe`banned; cashier uses`textContent` only; Trusted Types; strict CSP |
+| T3 | Bidi, zero-width or homoglyph tricks in the description                         | Cc/Cf/Co stripped; NFC; 200-character cap                                                              | Sanitizer tests (RLO, ZWJ, BOM, isolates)                                |
+| T4 | A description that imitates an amount (for example "1,000,000 ₮ төлсөн") | Amount is visually dominant and the only thing in the amount column; description is labelled and muted | Visual review; Playwright screenshot                                     |
+| T5 | CSV formula injection                                                           | Cells starting with `= + - @ \t \r` are prefixed with `'`                                          | CSV export test                                                          |
+| T6 | Cross-tenant writes                                                             | RLS + composite foreign keys + tenant-scoped session helper                                            | Isolation test suite                                                     |
+| T7 | CSRF on admin or cashier endpoints                                              | SameSite=Strict + synchronizer token + Origin check; the JSON API requires `application/json`        | CSRF tests per route                                                     |
+| T8 | Supply-chain tampering                                                          | Locked hashes; pip-audit and npm audit; minimal dependencies; no CDN                                   | CI                                                                       |
 
 **R: Repudiation**
 
-| ID | Threat | Mitigation |
-|---|---|---|
-| R1 | An admin denies revoking a device, exporting CSV or changing roles | Append-only `audit_log` (the database role cannot UPDATE or DELETE it) naming the object and actor |
-| R2 | A member disputes consent | Versioned consent rows (`version`, `sha256` of the text, `accepted_at`, `channel`, `revoked_at`) |
-| R3 | "The bank emailed but we were never notified" | `ingest_event` gives the reason code and Message-ID hash for every email, which can be matched without storing content |
+| ID | Threat                                                             | Mitigation                                                                                                               |
+| -- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| R1 | An admin denies revoking a device, exporting CSV or changing roles | Append-only `audit_log` (the database role cannot UPDATE or DELETE it) naming the object and actor                     |
+| R2 | A member disputes consent                                          | Versioned consent rows (`version`, `sha256` of the text, `accepted_at`, `channel`, `revoked_at`)               |
+| R3 | "The bank emailed but we were never notified"                      | `ingest_event` gives the reason code and Message-ID hash for every email, which can be matched without storing content |
 
 **I: Information disclosure**
 
-| ID | Threat | Mitigation | Verified by |
-|---|---|---|---|
-| I1 | Raw email leaks through logs, queues, temp files or crash reports | In-memory pipeline; only ids go into the queue; allowlist logging; no locals in tracebacks; no spooling | Marker test across logs, DB, Redis and the temp directory |
-| I2 | Balance, payer name or payer account leaks | Never captured by the parser; payer account becomes an HMAC and is discarded | Marker test across DB dump, API responses, notifications and logs |
-| I3 | One tenant reads another tenant's data | RLS, composite foreign keys, tenant-bound tokens and codes | Route enumeration: every endpoint with tenant B's ids returns 404 |
-| I4 | Inbound address leaks | Owner-only page; rotation; health check and `ingest_event` reveal unexpected traffic | — |
-| I5 | Shoulder surfing on a shared PC | Last 10 only; no history or export in the cashier view; voice threshold; shift end clears the UI and push | Playwright |
-| I6 | Notification content on lock screens or in Telegram (not end-to-end encrypted) | Disclosed on the consent page; Telegram is owners only; Web Push payload is encrypted in transit | Consent text review |
-| I7 | Database or backup theft | Encrypted fields with keys outside the database; age-encrypted backups; backup retention ≤ transaction retention | Restore drill |
-| I8 | Secrets in the repo or in chat | Only the `.env` file, which you create; `.env.example` has names only; never requested in chat | Secret-scan step in CI |
-| I9 | Tokens leak through URLs or Referer | Pairing and invite tokens in URL fragments (never sent in Referer); `Referrer-Policy: same-origin`, so other sites get no referrer; access log without query strings | Log test, header test |
-| I10 | Cloudflare fallback exposes raw email to a third party | Used only if Q4 requires it; the Worker never logs or stores; documented to the owner | — |
+| ID  | Threat                                                                         | Mitigation                                                                                                                                                             | Verified by                                                       |
+| --- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| I1  | Raw email leaks through logs, queues, temp files or crash reports              | In-memory pipeline; only ids go into the queue; allowlist logging; no locals in tracebacks; no spooling                                                                | Marker test across logs, DB, Redis and the temp directory         |
+| I2  | Balance, payer name or payer account leaks                                     | Never captured by the parser; payer account becomes an HMAC and is discarded                                                                                           | Marker test across DB dump, API responses, notifications and logs |
+| I3  | One tenant reads another tenant's data                                         | RLS, composite foreign keys, tenant-bound tokens and codes                                                                                                             | Route enumeration: every endpoint with tenant B's ids returns 404 |
+| I4  | Inbound address leaks                                                          | Owner-only page; rotation; health check and `ingest_event` reveal unexpected traffic                                                                                 | —                                                                |
+| I5  | Shoulder surfing on a shared PC                                                | Last 10 only; no history or export in the cashier view; voice threshold; shift end clears the UI and push                                                              | Playwright                                                        |
+| I6  | Notification content on lock screens or in Telegram (not end-to-end encrypted) | Disclosed on the consent page; Telegram is owners only; Web Push payload is encrypted in transit                                                                       | Consent text review                                               |
+| I7  | Database or backup theft                                                       | Encrypted fields with keys outside the database; age-encrypted backups; backup retention ≤ transaction retention                                                      | Restore drill                                                     |
+| I8  | Secrets in the repo or in chat                                                 | Only the `.env` file, which you create; `.env.example` has names only; never requested in chat                                                                     | Secret-scan step in CI                                            |
+| I9  | Tokens leak through URLs or Referer                                            | Pairing and invite tokens in URL fragments (never sent in Referer); `Referrer-Policy: same-origin`, so other sites get no referrer; access log without query strings | Log test, header test                                             |
+| I10 | Cloudflare fallback exposes raw email to a third party                         | Used only if Q4 requires it; the Worker never logs or stores; documented to the owner                                                                                  | —                                                                |
 
 **D: Denial of service**
 
-| ID | Threat | Mitigation |
-|---|---|---|
-| D1 | SMTP flood | Per-IP connection and session limits; RCPT rejection; size cap; timeouts; fail2ban |
-| D2 | Parser ReDoS or HTML bombs | 256 KB raw and decoded caps; capped MIME depth and node count; linear, anchored patterns; hypothesis fuzzing with a time budget |
-| D3 | SSE connection exhaustion | Authenticated before the stream opens; at most 2 streams per device; Caddy limits |
-| D4 | Attacker locks out admins | Progressive delays per account and IP rather than hard lockout for passwords; PIN lockout needs a paired device anyway |
-| D5 | Forwarding silently breaks (filter deleted, Gmail pauses forwarding, address rotated) | Health-check alert after N business hours with no accepted email; "Тест илгээх" self-check |
-| D6 | Telegram or push-service outage | Retries with backoff; SSE path is independent; failures shown on Тойм |
-| D7 | Inbound port 25 blocked by the host | Cloudflare fallback feeding the same pipeline (Q4) |
-| D8 | Disk filled by logs or the database | Log rotation; retention purge; disk alert in the health job |
+| ID | Threat                                                                                | Mitigation                                                                                                                      |
+| -- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| D1 | SMTP flood                                                                            | Per-IP connection and session limits; RCPT rejection; size cap; timeouts; fail2ban                                              |
+| D2 | Parser ReDoS or HTML bombs                                                            | 256 KB raw and decoded caps; capped MIME depth and node count; linear, anchored patterns; hypothesis fuzzing with a time budget |
+| D3 | SSE connection exhaustion                                                             | Authenticated before the stream opens; at most 2 streams per device; Caddy limits                                               |
+| D4 | Attacker locks out admins                                                             | Progressive delays per account and IP rather than hard lockout for passwords; PIN lockout needs a paired device anyway          |
+| D5 | Forwarding silently breaks (filter deleted, Gmail pauses forwarding, address rotated) | Health-check alert after N business hours with no accepted email; "Тест илгээх" self-check                            |
+| D6 | Telegram or push-service outage                                                       | Retries with backoff; SSE path is independent; failures shown on Тойм                                                       |
+| D7 | Inbound port 25 blocked by the host                                                   | Cloudflare fallback feeding the same pipeline (Q4)                                                                              |
+| D8 | Disk filled by logs or the database                                                   | Log rotation; retention purge; disk alert in the health job                                                                     |
 
 **E: Elevation of privilege**
 
-| ID | Threat | Mitigation | Verified by |
-|---|---|---|---|
-| E1 | Cashier or viewer reaches admin functions | Per-route role dependencies; separate origins; device credentials are not admin sessions | Role matrix test over every route |
-| E2 | Admin promotes themselves or removes the last owner | Only owners manage owner, admin and viewer roles; "at least one owner" check | Tests |
-| E3 | Device token used against admin routes or the reverse | Different cookie names, origins and auth dependencies | Tests |
-| E4 | Container escape or host compromise | Non-root, read-only filesystem, no capabilities, `no-new-privileges`, internal network for the database and Redis | Compose lint in CI |
-| E5 | SQL injection | SQLAlchemy bound parameters only; bandit | CI |
-| E6 | `/dev/ui` or debug routes in production | Not mounted unless `ENV=development`; startup guard | Test |
-| E7 | HTMX eval paths | `allowEval=false`, no `hx-on`, CSP without `unsafe-eval` | Template grep test |
+| ID | Threat                                                | Mitigation                                                                                                          | Verified by                       |
+| -- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| E1 | Cashier or viewer reaches admin functions             | Per-route role dependencies; separate origins; device credentials are not admin sessions                            | Role matrix test over every route |
+| E2 | Admin promotes themselves or removes the last owner   | Only owners manage owner, admin and viewer roles; "at least one owner" check                                        | Tests                             |
+| E3 | Device token used against admin routes or the reverse | Different cookie names, origins and auth dependencies                                                               | Tests                             |
+| E4 | Container escape or host compromise                   | Non-root, read-only filesystem, no capabilities, `no-new-privileges`, internal network for the database and Redis | Compose lint in CI                |
+| E5 | SQL injection                                         | SQLAlchemy bound parameters only; bandit                                                                            | CI                                |
+| E6 | `/dev/ui` or debug routes in production             | Not mounted unless `ENV=development`; startup guard                                                               | Test                              |
+| E7 | HTMX eval paths                                       | `allowEval=false`, no `hx-on`, CSP without `unsafe-eval`                                                      | Template grep test                |
 
 **Residual risks** that remain by design and go into the README:
 
@@ -511,18 +514,18 @@ audit_log                id, tenant_id, actor_kind (member|operator|system), act
 
 ### 3.3 SPEC §3 invariants → automated tests (written first)
 
-| # | Invariant | Test (in `server/tests/invariants/`) |
-|---|---|---|
-| 1 | No mailbox access | The locked dependency list contains no IMAP, POP, Gmail API, Microsoft Graph or mail-OAuth package; the source tree does not import `imaplib` or `poplib`; after importing the app, neither module is in `sys.modules` |
-| 2 | Checks a–g in order | One test per check. Emails that fail several checks report the earliest reason code. `ingest_event` contains only the three allowed fields. |
-| 3 | Deny-list | An OTP subject is dropped; `код` in the template part of the body is dropped; `код` inside the description is accepted |
-| 4 | Never extract balance, payer name or payer account | Marker values in those fields never appear in the DB, API, SSE, push payloads, Telegram text or logs |
-| 5 | No raw email stored or logged | Pipeline run with a body marker: absent from logs, DB, Redis keys and the temp directory |
-| 6 | Description is untrusted | Sanitizer cases (control, zero-width, bidi, 10 KB description); escaping in Jinja, the DOM and Telegram; Playwright run with a `<script>` description |
-| 7 | No LLM, no link following | No LLM SDK in the lockfile; the pipeline runs with sockets disabled except stubbed DNS; HTML with links and images makes no fetches |
-| 8 | Idempotency, exactly once | The same email twice gives one transaction; concurrent `fanout` gives one delivery per (channel, target) |
-| 9 | Tenant isolation | Two-tenant fixture; every route probed with the other tenant's ids; a meta-test checks that every table with `tenant_id` has an RLS policy; composite foreign keys reject cross-tenant links |
-| 10 | Consent | No consent gives no delivery; revoking between `fanout` and `send` gives `skipped`; revocation closes the stream and deletes push subscriptions |
+| #  | Invariant                                          | Test (in `server/tests/invariants/`)                                                                                                                                                                                       |
+| -- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | No mailbox access                                  | The locked dependency list contains no IMAP, POP, Gmail API, Microsoft Graph or mail-OAuth package; the source tree does not import `imaplib` or `poplib`; after importing the app, neither module is in `sys.modules` |
+| 2  | Checks a–g in order                               | One test per check. Emails that fail several checks report the earliest reason code. `ingest_event` contains only the three allowed fields.                                                                                |
+| 3  | Deny-list                                          | An OTP subject is dropped; `код` in the template part of the body is dropped; `код` inside the description is accepted                                                                                             |
+| 4  | Never extract balance, payer name or payer account | Marker values in those fields never appear in the DB, API, SSE, push payloads, Telegram text or logs                                                                                                                         |
+| 5  | No raw email stored or logged                      | Pipeline run with a body marker: absent from logs, DB, Redis keys and the temp directory                                                                                                                                     |
+| 6  | Description is untrusted                           | Sanitizer cases (control, zero-width, bidi, 10 KB description); escaping in Jinja, the DOM and Telegram; Playwright run with a `<script>` description                                                                      |
+| 7  | No LLM, no link following                          | No LLM SDK in the lockfile; the pipeline runs with sockets disabled except stubbed DNS; HTML with links and images makes no fetches                                                                                          |
+| 8  | Idempotency, exactly once                          | The same email twice gives one transaction; concurrent `fanout` gives one delivery per (channel, target)                                                                                                                   |
+| 9  | Tenant isolation                                   | Two-tenant fixture; every route probed with the other tenant's ids; a meta-test checks that every table with `tenant_id` has an RLS policy; composite foreign keys reject cross-tenant links                               |
+| 10 | Consent                                            | No consent gives no delivery; revoking between `fanout` and `send` gives `skipped`; revocation closes the stream and deletes push subscriptions                                                                        |
 
 ---
 

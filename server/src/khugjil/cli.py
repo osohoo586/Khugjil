@@ -135,7 +135,7 @@ async def _tenant_create(name: str) -> int:
     settings = Settings()
     rt = await Runtime.create(settings)
     try:
-        tenant_id, local = await create_tenant(rt.sm, rt.crypto, name)
+        tenant_id, local = await create_tenant(rt.sm, rt.crypto, name, pin_shifts=False)
         print(f"tenant_id={tenant_id}")
         print(f"inbound_address={local}@{settings.inbound_domain}")
         from khugjil.services.invites import create_owner_invite

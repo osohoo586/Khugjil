@@ -20,6 +20,7 @@ from khugjil.auth.devices import (
     PairingError,
     ShiftError,
     authenticate_device,
+    ensure_auto_shift,
     open_shift,
     record_pin_failure,
     redeem_pairing,
@@ -238,7 +239,7 @@ async def device_info(auth: Device_, rt: Rt) -> dict[str, Any]:
         device = await s.get(Device, auth.device_id)
         if tenant is None or device is None:  # pragma: no cover - auth guarantees both
             raise fail(401, "unauthorized")
-        shift = await open_shift(s, auth.device_id)
+        shift = await ensure_auto_shift(s, tenant, auth.device_id, utcnow())
         shift_member = await s.get(Member, shift.member_id) if shift else None
         candidates = await shift_candidates(s, auth.device_id)
         accounts: list[str] = []
@@ -256,6 +257,7 @@ async def device_info(auth: Device_, rt: Rt) -> dict[str, Any]:
         "voice_enabled": tenant.voice_enabled,
         "voice_max_amount": str(tenant.voice_max_amount) if tenant.voice_max_amount else None,
         "show_today_totals": tenant.show_today_totals,
+        "pin_shifts": tenant.cashier_pin_shifts,
         "multiple_accounts": account_count > 1,
         "accounts": accounts,
         "members": [{"id": str(m.id), "display_name": m.display_name} for m in candidates],
@@ -319,10 +321,12 @@ async def shift_activity(auth: Device_, rt: Rt) -> dict[str, Any]:
 async def transactions(auth: Device_, rt: Rt, since_seq: int | None = None) -> dict[str, Any]:
     async with tenant_session(rt.sm, auth.tenant_id) as s:
         shift = await _require_shift(s, auth.device_id)
+        tenant = await s.get(Tenant, auth.tenant_id)
         ids = await visible_account_ids(s, auth.device_id, shift.member_id)
-        stmt = select(Transaction).where(
-            Transaction.bank_account_id.in_(ids), Transaction.received_at >= shift.started_at
-        )
+        stmt = select(Transaction).where(Transaction.bank_account_id.in_(ids))
+        if tenant is None or tenant.cashier_pin_shifts:
+            # With PIN shifts a cashier sees only their own shift; without, the last 10 items.
+            stmt = stmt.where(Transaction.received_at >= shift.started_at)
         if since_seq is not None:
             stmt = stmt.where(Transaction.seq > since_seq)
         rows = list(

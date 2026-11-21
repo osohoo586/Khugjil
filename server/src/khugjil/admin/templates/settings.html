@@ -17,6 +17,8 @@
     {{ ui.field("voice_max_amount", "Энэ дүнгээс дээш бол зөвхөн дохио өгөх (₮)", value=(t.voice_max_amount or ""), attrs={"inputmode": "decimal"}, hint="Хоосон бол бүх дүнг уншина.") }}
   </fieldset>
   <fieldset><legend>Ээлж</legend>
+    <label class="check"><input type="checkbox" name="cashier_pin_shifts" value="true"{% if t.cashier_pin_shifts %} checked{% endif %}> Кассчин ПИН кодоор ээлж эхлүүлнэ</label>
+    <p class="muted">Сонгоогүй бол холбосон кассын төхөөрөмж ээлж, ПИН кодгүйгээр сүүлийн гүйлгээнүүдийг шууд харуулна. Доорх хоёр тохиргоо зөвхөн ПИН кодтой ээлжид хамаарна.</p>
     {{ ui.field("shift_idle_hours", "Идэвхгүй бол ээлж дуусах хугацаа (цаг)", value=t.shift_idle_hours, type="number", required=True, attrs={"min": "1", "max": "24"}) }}
     {{ ui.field("shift_end_time", "Ээлж автоматаар дуусах цаг", value=(t.shift_end_time.strftime("%H:%M") if t.shift_end_time else ""), type="time", hint="Хоосон бол тохируулахгүй.") }}
   </fieldset>

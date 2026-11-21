@@ -87,6 +87,11 @@ class Tenant(Base):
     auto_add_accounts: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+    # Owner's choice (2026-11-21): when false, a paired device needs no PIN shift; it opens one
+    # itself for a consenting owner/admin of its groups (auth.devices.ensure_auto_shift).
+    cashier_pin_shifts: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
     toast_seconds: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="8")
     voice_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")

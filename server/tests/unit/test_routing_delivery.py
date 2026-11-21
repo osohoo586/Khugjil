@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import replace
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -15,11 +15,19 @@ from hypothesis import given
 from hypothesis import strategies as st
 from sqlalchemy import text
 
-from khugjil.db.models import Consent, DutyWindow, Member, TelegramLink
+from khugjil.db.models import Consent, DutyWindow, Member, TelegramLink, Transaction
 from khugjil.db.tenancy import tenant_session
 from khugjil.delivery.format import build_notification, format_amount, format_datetime, format_time
 from khugjil.delivery.notifier import SendResult, SendTarget
-from khugjil.delivery.service import DeliveryDeps, ack, fanout, send
+from khugjil.delivery.service import (
+    LATE_AFTER,
+    DeliveryDeps,
+    ack,
+    fanout,
+    is_late,
+    notification_for,
+    send,
+)
 from khugjil.delivery.telegram import send_message_payload
 from khugjil.events import RecordingEventBus, _event
 from khugjil.routing.eligibility import eligible_targets
@@ -216,6 +224,15 @@ def deps_with(world: Any, result: SendResult) -> tuple[DeliveryDeps, Scripted]:
         "sse": n, "webpush": n, "telegram": n}), n  # fmt: skip
 
 
+async def _received_after(world: Any, txn_id: uuid.UUID, delay: timedelta) -> Transaction:
+    """The fake bank email carries a fixed date; set when the server got it, relative to that."""
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        txn = await s.get(Transaction, txn_id)
+        assert txn is not None
+        txn.received_at = txn.txn_at + delay
+        return txn
+
+
 @pytest.mark.db
 async def test_fanout_includes_webpush_and_owner_telegram(world: Any, mailer: Mailer) -> None:
     await world.add_push_subscription()
@@ -241,9 +258,27 @@ async def test_fanout_includes_webpush_and_owner_telegram(world: Any, mailer: Ma
             s.add(DutyWindow(tenant_id=world.tenant_id, member_id=owner.id, weekday=wd,
                              start_local=time(0), end_local=time(23, 59)))  # fmt: skip
     outcome = await world.ingest(mailer.bank_mail())
+    assert not is_late(await _received_after(world, outcome.transaction_id, timedelta(seconds=6)))
     await world.fanout(outcome.transaction_id)
     channels = sorted(r["channel"] for r in await world.rows("delivery"))
     assert channels == ["sse", "telegram", "webpush"]
+
+
+@pytest.mark.db
+async def test_late_income_is_listed_but_not_pushed(world: Any, mailer: Mailer) -> None:
+    """Gmail retried for hours while the server was off: no Web Push, and the device is told."""
+    await world.add_push_subscription()
+    outcome = await world.ingest(mailer.bank_mail())
+    late = await _received_after(world, outcome.transaction_id, LATE_AFTER + timedelta(seconds=1))
+    assert is_late(late)
+    await world.fanout(outcome.transaction_id)
+    assert [r["channel"] for r in await world.rows("delivery")] == ["sse"]
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        txn = await s.get(Transaction, outcome.transaction_id)
+        assert txn is not None
+        deps = DeliveryDeps(crypto=world.db.crypto, sessionmaker=world.db.sm, notifiers={})
+        note = await notification_for(deps, s, world.tenant_id, txn)
+    assert note.to_api()["late"] is True
 
 
 @pytest.mark.db

@@ -1,5 +1,5 @@
 import { h, replace } from "./dom";
-import { hero, txnList, verifyResult } from "./ui/screens";
+import { FEED_LIMIT, Feed } from "./ui/feed";
 import type { Txn } from "./api";
 
 const evil = '<img src=x onerror="window.pwned=1"><script>window.pwned=1</script>';
@@ -18,14 +18,11 @@ describe("untrusted descriptions are rendered as text only", () => {
     expect(el.textContent).toBe(evil);
     expect(el.querySelector("img, script")).toBeNull();
   });
-  it("hero, list and verify box never create elements from descriptions", () => {
-    const t = txn({ description: evil });
-    const root = h("div", {}, hero(t, true, new Date(), true), txnList([t], true));
-    const out = h("p");
-    verifyResult(out, [t], null);
-    root.append(out);
-    expect(root.querySelector("img, script")).toBeNull();
-    expect(root.textContent).toContain(evil);
+  it("the feed never creates elements from descriptions", () => {
+    const feed = new Feed(true);
+    feed.update([txn({ description: evil })], new Set(), new Date());
+    expect(feed.el.querySelector("img, script")).toBeNull();
+    expect(feed.el.textContent).toContain(evil);
     expect((window as { pwned?: number }).pwned).toBeUndefined();
   });
   it("rejects string event handlers", () => {
@@ -38,27 +35,43 @@ describe("untrusted descriptions are rendered as text only", () => {
   });
 });
 
-describe("screens", () => {
-  it("list shows the account column only for multi-account tenants and truncates with a tooltip", () => {
-    const list = txnList([txn()], false);
-    expect(list.querySelectorAll("th")).toHaveLength(3);
-    expect(list.querySelector("td.truncate")?.getAttribute("title")).toBe("Худалдан авалт");
-    expect(txnList([txn()], true).querySelectorAll("th")).toHaveLength(4);
-    expect(txnList([], false).textContent).toContain("хоосон");
+describe("feed", () => {
+  const now = new Date("2026-10-15T00:40:00Z");
+  const many = Array.from({ length: 8 }, (_, i) => txn({ id: `t${i}`, seq: 8 - i, amount_text: `${i + 1},000 ₮` }));
+
+  it("shows only the latest five, newest first and marked, with time and a short age", () => {
+    const feed = new Feed(false);
+    feed.update(many, new Set(["t0"]), now);
+    const rows = feed.el.querySelectorAll(".row");
+    expect(rows).toHaveLength(FEED_LIMIT);
+    expect(rows[0]?.className).toBe("row latest new");
+    expect(rows[1]?.className).toBe("row");
+    expect(rows[0]?.querySelector(".row-amount")?.textContent).toBe("1,000 ₮");
+    expect(rows[0]?.querySelector(".row-time")?.textContent).toBe("08:37");
+    expect(rows[0]?.querySelector(".row-ago")?.textContent).toBe("3 мин өмнө");
+    expect(rows[0]?.querySelector(".row-desc")?.getAttribute("title")).toBe("Худалдан авалт");
+    expect(feed.el.querySelector(".row-alias")).toBeNull();
   });
-  it("verify box messages", () => {
-    const out = h("p");
-    verifyResult(out, [txn()], null);
-    expect(out.textContent).toBe("Орсон байна — 08:37, Худалдан авалт");
-    verifyResult(out, [], null);
-    expect(out.textContent).toBe("Сүүлийн 15 минутад ийм дүнтэй орлого ороогүй байна");
-    verifyResult(out, null, null);
-    expect(out.textContent).toBe("Шалгаж байна…");
-    verifyResult(out, null, "Алдаа");
-    expect(out.className).toContain("error");
+
+  it("keeps rows across updates: a new income goes on top, the oldest drops off", () => {
+    const feed = new Feed(true);
+    feed.update(many.slice(1), new Set(), now);
+    const kept = feed.el.querySelector('[data-id="t1"]');
+    feed.update(many, new Set(["t0"]), now);
+    expect(feed.el.querySelector('[data-id="t1"]')).toBe(kept);
+    expect([...feed.el.querySelectorAll(".row")].map((r) => r.getAttribute("data-id"))).toEqual(["t0", "t1", "t2", "t3", "t4"]);
+    expect(feed.el.querySelector(".row-alias")?.textContent).toBe("Төв дэлгүүр");
+    feed.update(many, new Set(), now);
+    expect(feed.el.querySelector(".row")?.className).toBe("row latest");
   });
-  it("hero highlights new items and shows an empty state", () => {
-    expect(hero(txn(), false, new Date(), true).className).toBe("hero new");
-    expect(hero(null, false, new Date(), false).textContent).toContain("орлого ороогүй");
+
+  it("empty state, and a placeholder for an income without a description", () => {
+    const feed = new Feed(false);
+    feed.update([], new Set(), now);
+    expect(feed.el.querySelector<HTMLElement>(".feed-empty")?.hidden).toBe(false);
+    expect(feed.el.querySelector<HTMLElement>(".feed-list")?.hidden).toBe(true);
+    feed.update([txn({ description: "" })], new Set(), now);
+    expect(feed.el.querySelector<HTMLElement>(".feed-empty")?.hidden).toBe(true);
+    expect(feed.el.querySelector(".row-desc")?.className).toBe("row-desc muted");
   });
 });

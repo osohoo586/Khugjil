@@ -43,6 +43,8 @@ class Notification:
     datetime_text: str
     account_alias: str | None
     test: bool = False
+    # Reached the server long after the bank made it (forwarding was down): listed, not announced.
+    late: bool = False
 
     def lines(self) -> list[str]:
         out = ["Туршилт"] if self.test else []
@@ -70,6 +72,7 @@ class Notification:
             "datetime_text": self.datetime_text,
             "account_alias": self.account_alias,
             "test": self.test,
+            "late": self.late,
         }
 
 
@@ -84,6 +87,7 @@ def build_notification(
     account_alias: str | None,
     show_alias: bool,
     test: bool = False,
+    late: bool = False,
 ) -> Notification:
     return Notification(
         transaction_id=transaction_id,
@@ -97,4 +101,5 @@ def build_notification(
         datetime_text=format_datetime(txn_at),
         account_alias=account_alias if show_alias else None,
         test=test,
+        late=late,
     )

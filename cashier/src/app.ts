@@ -1,40 +1,47 @@
 import { type Api, ApiError, type DeviceInfo, type Txn } from "./api";
 import { Chime } from "./audio";
 import { h, replace } from "./dom";
-import { clock, parseAmountInput } from "./format";
+import { clock } from "./format";
 import type { LiveConnection, Platform } from "./platform";
+import { Feed } from "./ui/feed";
 import {
   HIGHLIGHT_MS,
   LIST_LIMIT,
-  hero,
   inviteScreen,
   message,
   pairScreen,
   revokedScreen,
   shiftStart,
   topBar,
-  txnList,
-  verifyBox,
-  verifyResult,
 } from "./ui/screens";
 import { loadVoice, type Voice } from "./voice";
 
 const DISCONNECT_BANNER_MS = 5_000;
 const ACTIVITY_MS = 5 * 60_000;
+/** Newest bank time first, so a late arrival slots in where it belongs instead of on top. */
+export function byBankTime(items: Txn[]): Txn[] {
+  return [...items].sort((a, b) => Date.parse(b.txn_at) - Date.parse(a.txn_at) || b.seq - a.seq);
+}
+
+const NO_VIEWER =
+  "Энэ төхөөрөмжөөр гүйлгээ харах эрхтэй хүн алга. Админ «Бүлгүүд» хуудаснаас төхөөрөмжийн бүлэгт эзэмшигчийг нэмнэ үү.";
 
 export class CashierApp {
   private info: DeviceInfo | null = null;
   private items: Txn[] = [];
-  private highlightUntil = 0;
+  /** Transaction id -> time until which its row stays highlighted. */
+  private readonly freshUntil = new Map<string, number>();
+  private feed: Feed | null = null;
+  /** Without PIN shifts and with nobody to open one for: re-check on every tick. */
+  private waitingForViewer = false;
   private stream: LiveConnection | null = null;
   private connected = true;
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastActivity = 0;
-  private verifyTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly chime = new Chime();
   private readonly api: Api;
   private voice: Voice | null = null;
-  private refs: { status?: HTMLElement; clock?: HTMLElement; banner?: HTMLElement; sound?: HTMLElement; hero?: HTMLElement; list?: HTMLElement; footer?: HTMLElement } = {};
+  private refs: { status?: HTMLElement; clock?: HTMLElement; banner?: HTMLElement; sound?: HTMLElement; footer?: HTMLElement } = {};
 
   constructor(
     private readonly root: HTMLElement,
@@ -72,12 +79,18 @@ export class CashierApp {
       replace(this.root, message(e instanceof ApiError ? e.message : "Алдаа гарлаа.", "error"));
       return;
     }
+    this.waitingForViewer = false;
     document.documentElement.dataset.accent = this.info.accent;
     this.platform.notifier.setSeconds(this.info.toast_seconds);
     if (!this.info.shift) {
       this.stream?.close();
       this.stream = null;
-      this.renderShiftStart(this.info);
+      this.feed = null;
+      if (this.info.pin_shifts) this.renderShiftStart(this.info);
+      else {
+        this.waitingForViewer = true;
+        replace(this.root, topBar(this.info, new Date(), null).el, message(NO_VIEWER, "error"));
+      }
       return;
     }
     await this.loadItems();
@@ -106,14 +119,14 @@ export class CashierApp {
   }
 
   private async loadItems(): Promise<void> {
-    this.items = (await this.api.transactions()).items;
+    this.items = byBankTime((await this.api.transactions()).items);
   }
 
   private renderMain(): void {
     const info = this.info;
     if (!info) return;
     const now = new Date();
-    const top = topBar(info, now, () => void this.endShift());
+    const top = topBar(info, now, info.pin_shifts ? () => void this.endShift() : null);
     this.refs.status = top.status;
     this.refs.clock = top.clockEl;
     this.refs.banner = h("div", { class: "banner banner-error", role: "alert", hidden: true }, "Холболт тасарсан — орлогын мэдэгдэл ирэхгүй байж болзошгүй");
@@ -122,10 +135,8 @@ export class CashierApp {
       { type: "button", class: "banner banner-sound", hidden: this.chime.unlocked, onclick: () => void this.unlockSound() },
       "Дуу идэвхгүй — дарж идэвхжүүлнэ үү",
     );
-    this.refs.hero = h("div");
-    this.refs.list = h("div");
+    this.feed = new Feed(info.multiple_accounts);
     this.refs.footer = h("footer", { class: "totals", hidden: !info.show_today_totals });
-    const verify = verifyBox((value, out) => this.onVerifyInput(value, out));
     // No account is shared by this device, this cashier and an active group: nothing can arrive.
     const noAccounts = info.accounts.length === 0
       ? message("Энэ ээлжинд харах данс алга тул гүйлгээ ирэхгүй. Админ «Бүлгүүд» хуудаснаас таны бүлэгт данс холбоно уу.", "error")
@@ -136,7 +147,7 @@ export class CashierApp {
       this.refs.banner,
       this.refs.sound,
       noAccounts,
-      h("main", { class: "grid" }, h("div", { class: "main-hero" }, this.refs.hero), verify, h("div", { class: "main-list" }, this.refs.list)),
+      this.feed.el,
       this.refs.footer,
     );
     this.refreshDynamic();
@@ -145,10 +156,14 @@ export class CashierApp {
 
   private refreshDynamic(): void {
     const info = this.info;
-    if (!info || !this.refs.hero || !this.refs.list) return;
+    if (!info || !this.feed) return;
     const now = new Date();
-    replace(this.refs.hero, hero(this.items[0] ?? null, info.multiple_accounts, now, Date.now() < this.highlightUntil));
-    replace(this.refs.list, txnList(this.items, info.multiple_accounts));
+    const fresh = new Set<string>();
+    for (const [id, until] of this.freshUntil) {
+      if (until > now.getTime()) fresh.add(id);
+      else this.freshUntil.delete(id);
+    }
+    this.feed.update(this.items, fresh, now);
     if (this.refs.clock) replace(this.refs.clock, clock(now));
   }
 
@@ -164,6 +179,8 @@ export class CashierApp {
 
   private async unlockSound(): Promise<void> {
     if ((await this.chime.unlock()) && this.refs.sound) this.refs.sound.hidden = true;
+    // Without a PIN shift this click is the only user gesture, so it also asks for notifications.
+    if (this.info && !this.info.pin_shifts) await this.platform.enableBackground(this.info).catch(() => undefined);
   }
 
   private async endShift(): Promise<void> {
@@ -220,7 +237,7 @@ export class CashierApp {
   }
 
   private async catchUp(): Promise<void> {
-    const since = this.items[0]?.seq;
+    const since = this.items.length ? Math.max(...this.items.map((t) => t.seq)) : undefined;
     try {
       const { items } = await this.api.transactions(since);
       for (const t of [...items].reverse()) this.receive(t, true);
@@ -231,13 +248,14 @@ export class CashierApp {
 
   receive(t: Txn, announce: boolean): void {
     if (this.items.some((x) => x.id === t.id)) return; // exactly-once on screen
-    this.items = [t, ...this.items].slice(0, LIST_LIMIT);
-    this.highlightUntil = Date.now() + HIGHLIGHT_MS;
+    this.items = byBankTime([t, ...this.items]).slice(0, LIST_LIMIT);
+    if (!t.late) this.freshUntil.set(t.id, Date.now() + HIGHLIGHT_MS);
     this.refreshDynamic();
     setTimeout(() => this.refreshDynamic(), HIGHLIGHT_MS + 50);
     void this.api.ack(t.id).catch(() => undefined);
     void this.refreshTotals();
-    if (!announce || !this.info) return;
+    // A late arrival is an old payment: announcing it could be taken for the customer at the till.
+    if (!announce || !this.info || t.late) return;
     this.platform.notifier.show(t, this.info.multiple_accounts);
     this.platform.attention.notify(`Орлого ${t.amount_text}`);
     void this.announce(t);
@@ -256,29 +274,7 @@ export class CashierApp {
     this.chime.play();
   }
 
-  // ------------------------------------------------------------ verify box + activity
-
-  private onVerifyInput(value: string, out: HTMLElement): void {
-    this.noteActivity();
-    if (this.verifyTimer) clearTimeout(this.verifyTimer);
-    const amount = parseAmountInput(value);
-    if (amount === null) {
-      replace(out, value.trim() ? "Дүнгээ тоогоор оруулна уу." : "");
-      out.className = "verify-result muted";
-      return;
-    }
-    this.verifyTimer = setTimeout(async () => {
-      const slow = setTimeout(() => verifyResult(out, null, null), 300);
-      try {
-        const { matches } = await this.api.verify(amount);
-        verifyResult(out, matches, null);
-      } catch (e) {
-        verifyResult(out, null, e instanceof ApiError ? e.message : "Алдаа гарлаа.");
-      } finally {
-        clearTimeout(slow);
-      }
-    }, 300);
-  }
+  // ------------------------------------------------------------ activity
 
   noteActivity(): void {
     if (!this.info?.shift || Date.now() - this.lastActivity < ACTIVITY_MS) return;
@@ -288,6 +284,10 @@ export class CashierApp {
 
   tick(): void {
     this.refreshDynamic();
+    if (this.waitingForViewer) void this.load();
+    // Safety net besides the live stream: if an event was lost (a worker restart, a dropped
+    // connection that never errored), the next tick still brings the income in.
+    else if (this.feed && this.info?.shift && this.connected) void this.catchUp();
   }
 
   // ------------------------------------------------------------ pairing + invites

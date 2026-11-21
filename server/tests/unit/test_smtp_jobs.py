@@ -244,6 +244,17 @@ async def test_auto_end_shift_duty_end(world: Any) -> None:
     assert shift["end_reason"] == "duty_end"
 
 
+async def test_auto_end_skips_tenants_without_pin_shifts(world: Any) -> None:
+    """Their devices would reopen the shift at once; duty is checked per delivery instead."""
+    now = datetime.now(UTC)
+    async with tenant_session(world.db.sm, world.tenant_id) as s:
+        await s.execute(update(Tenant).values(cashier_pin_shifts=False))
+        await s.execute(update(Shift).values(last_activity_at=now - timedelta(hours=30)))
+    assert await auto_end_shifts(world.db.sm, RecordingEventBus(), now) == 0
+    (shift,) = await world.rows("shift")
+    assert shift["ended_at"] is None
+
+
 async def test_purge_respects_retention(world: Any, mailer: Mailer) -> None:
     await world.ingest(mailer.bank_mail())
     now = datetime.now(UTC)

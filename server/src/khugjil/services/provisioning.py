@@ -33,11 +33,13 @@ def account_hmac(crypto: Crypto, tenant_id: uuid.UUID, number: str) -> bytes:
     return crypto.hmac(Purpose.ACCOUNT_HMAC, tenant_id, canonical_account(number))
 
 
-async def create_tenant(sm: SessionMaker, crypto: Crypto, name: str) -> tuple[uuid.UUID, str]:
+async def create_tenant(
+    sm: SessionMaker, crypto: Crypto, name: str, *, pin_shifts: bool = True
+) -> tuple[uuid.UUID, str]:
     """Returns (tenant_id, inbound local part)."""
     tenant_id = uuid.uuid4()
     async with tenant_session(sm, tenant_id) as s:
-        s.add(Tenant(id=tenant_id, name=name))
+        s.add(Tenant(id=tenant_id, name=name, cashier_pin_shifts=pin_shifts))
         await s.flush()
         local = await _add_inbound(s, crypto, tenant_id)
     return tenant_id, local

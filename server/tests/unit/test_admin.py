@@ -242,6 +242,47 @@ async def test_groups_link_members_devices(
     assert (await h.client.post(f"/groups/{group_id}", data=bogus)).status_code == 404
 
 
+async def test_overview_lists_latest_incomes_live_without_extending_the_session(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any, mailer: Mailer
+) -> None:
+    h, _, _ = owner
+    await world.ingest(mailer.bank_mail())
+    page = (await h.client.get("/")).text
+    assert 'hx-get="/overview/live" hx-trigger="every 10s"' in page
+    assert "Худалдан авалт" in page
+    before = [r["last_seen_at"] for r in await world.rows("session")]
+    r = await h.client.get("/overview/live", headers={"hx-request": "true"})
+    assert r.status_code == 200
+    assert "2,800 ₮" in r.text
+    assert "<html" not in r.text
+    assert [r["last_seen_at"] for r in await world.rows("session")] == before  # a poll is not use
+    await h.client.get("/history")
+    assert [r["last_seen_at"] for r in await world.rows("session")] != before
+
+
+async def test_group_and_account_edits_refresh_open_cashier_pages(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any
+) -> None:
+    """Admin and cashier stay in step: an edit reloads every active device's info at once."""
+    from khugjil.events import RecordingEventBus, RedisEventBus
+
+    h, csrf, _ = owner
+    bus = RecordingEventBus()
+    h.rt.__class__.bus = property(lambda self: bus)  # type: ignore[method-assign]
+    try:
+        data = {"csrf": csrf, "name": "Төв дэлгүүр", "status": "active",
+                "account_ids": [str(world.account_id)], "device_ids": [str(world.device_id)]}  # fmt: skip
+        assert (await h.client.post(f"/groups/{world.group_id}", data=data)).status_code == 303
+        r = await h.client.post(
+            f"/accounts/{world.account_id}", data={"csrf": csrf, "alias": "Төв", "status": "active"}
+        )
+        assert r.status_code == 303
+    finally:
+        del h.rt.__class__.bus
+        h.rt.__class__.bus = property(lambda self: RedisEventBus(self.redis))  # type: ignore[method-assign]
+    assert bus.events == [(world.device_id, {"type": "settings_changed"})] * 2
+
+
 async def test_member_invite_reinvite_schedule_revoke(
     owner: tuple[ApiHarness, str, uuid.UUID], world: Any
 ) -> None:
@@ -581,3 +622,23 @@ async def test_settings_toggle_auto_add_accounts(
     assert (await h.client.post("/settings", data=data)).status_code == 303
     tenant = (await world.rows("tenant"))[0]
     assert tenant["auto_add_accounts"] is True
+
+
+async def test_settings_pin_shifts_toggle_ends_shifts_opened_without_a_pin(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any
+) -> None:
+    h, csrf, _ = owner
+    page = (await h.client.get("/settings")).text
+    assert 'name="cashier_pin_shifts" value="true" checked' in page  # fixture tenants use PINs
+    data = {
+        "csrf": csrf, "accent": "green", "toast_seconds": "8", "health_silence_hours": "4",
+        "shift_idle_hours": "8", "business_start": "09:00", "business_end": "21:00",
+    }  # fmt: skip
+    assert (await h.client.post("/settings", data=data)).status_code == 303
+    assert (await world.rows("tenant"))[0]["cashier_pin_shifts"] is False
+    assert (await world.rows("shift"))[0]["ended_at"] is None  # turning PINs off ends nothing
+    data["cashier_pin_shifts"] = "true"
+    assert (await h.client.post("/settings", data=data)).status_code == 303
+    assert (await world.rows("tenant"))[0]["cashier_pin_shifts"] is True
+    (shift,) = await world.rows("shift")
+    assert shift["end_reason"] == "manual"

@@ -14,10 +14,10 @@ export function relativeTime(then: Date, now: Date): string {
   const seconds = Math.max(0, Math.round((now.getTime() - then.getTime()) / 1000));
   if (seconds < 45) return "Дөнгөж сая";
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} минутын өмнө`;
+  if (minutes < 60) return `${minutes} мин өмнө`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} цагийн өмнө`;
-  return `${Math.round(hours / 24)} өдрийн өмнө`;
+  if (hours < 24) return `${hours} цаг өмнө`;
+  return `${Math.round(hours / 24)} өдөр өмнө`;
 }
 
 export function clock(now: Date): string {

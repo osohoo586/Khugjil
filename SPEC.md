@@ -152,6 +152,21 @@ description; "код" inside the description; duplicates; Latin vs Cyrillic
 - Shared PC: members start and end shifts with a personal PIN (argon2id,
   rate limit, lockout). Auto-end the shift after N hours of inactivity or at
   a scheduled time. Ending a shift unsubscribes Web Push for that member.
+- Without PIN shifts (owner's choice, 2026-11-21; tenant setting
+  `cashier_pin_shifts`, off for real tenants): pairing is the only sign-in.
+  The paired device opens its own shift for the first active owner, then
+  admin, of its groups who has an active web consent, so the delivery gate
+  (consent, duty, groups, device) is unchanged. There is no PIN screen and no
+  "Ээлж дуусгах" button, nothing auto-ends the shift, and the feed shows the
+  latest items instead of only the current shift's. The "Дуу идэвхгүй" bar is
+  then the gesture that unlocks audio and asks for Web Push. Turning PIN
+  shifts back on ends every open shift.
+- Late arrivals (2026-11-21): an income the server receives more than 10 min
+  after the bank's own time (Gmail retried while the server was off) is
+  delivered over SSE flagged `late` and is never announced: no Web Push, no
+  toast, chime or title flash, no highlight. The feed orders by bank time, so
+  it slots in where it belongs. Besides the live stream, the page also asks for
+  anything newer every 30 s, so a lost event still arrives.
 - Known limitation (document it in README, Mongolian): Windows 11 hides OS
   notification banners while another app is full-screen. The in-page view
   and sound still work. Recommended setup: keep the cashier page in a narrow
@@ -245,25 +260,26 @@ Format rules:
     red bar "Холболт тасарсан — орлогын мэдэгдэл ирэхгүй байж болзошгүй" when
     disconnected for more than 5s.
   - On-duty member name, clock, and an "Ээлж дуусгах" button (right).
-- Hero row — the latest transaction:
-  - Amount at 48px.
-  - Description and time below it.
-  - Relative time ("2 минутын өмнө").
-  - A new item highlights with a subtle accent background for 10s.
-- List — the last 10 transactions only. Columns: Цаг | Дүн | Утга
-  (+ Данс if >1 account). The amount column is right-aligned and tabular;
-  the description truncates with the full text in a tooltip.
-- Verify box: "Дүнгээр шалгах" input. As the cashier types an amount, show
-  any match from the last 15 minutes:
-  - match: "Орсон байна — 08:37, Худалдан авалт";
-  - no match: "Сүүлийн 15 минутад ийм дүнтэй орлого ороогүй байна".
+    Without PIN shifts (§6.1): only the clock, no name, no button.
+- Feed — the last 5 transactions only (owner's choice, 2026-11-21; replaces
+  the hero row, the 10-row table and the verify box). One row per income,
+  newest first, no column headers:
+  - Time (HH:MM, tabular) with a short relative time below ("3 мин өмнө"),
+    the description (up to 2 lines, full text in a tooltip; + account alias
+    if >1 account), and the amount right-aligned and tabular.
+  - The newest row is the largest: amount 48px, description and time 28px;
+    the others 28px and 20px.
+  - A new income slides in at the top and the others glide down (none with
+    prefers-reduced-motion). It is highlighted with the accent tint and a
+    4px accent left edge for 10s, then fades back.
+  - Empty state: "Орлого орж ирэхэд энд харагдана."
 - Optional (tenant setting, default off): today's count and total in the
   footer.
-- No navigation, no settings, no history beyond 10 items, no export.
+- No navigation, no settings, no history beyond 5 items, no export.
 - Layouts:
   - Full layout at ≥1024px.
-  - Compact layout at 360–480px wide: hero + list stacked, verify box at the
-    top, so it can sit docked beside the POS program.
+  - Compact layout at 360–480px wide: time and amount on one line, the
+    description below, so it can sit docked beside the POS program.
   - Phone layout for the PWA.
   - Large hit targets (≥40px).
 

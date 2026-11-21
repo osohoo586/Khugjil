@@ -20,10 +20,7 @@
     <p class="muted">Сүүлийн 24 цаг</p>
   </section>
 </div>
-<section>
-  <h2>Өнөөдөр</h2>
-  <p class="today"><span class="tabular">{{ today_count }} гүйлгээ</span><span class="tabular num">{{ today_total | amount }}</span></p>
-</section>
+<div hx-get="/overview/live" hx-trigger="every 10s" hx-swap="innerHTML">{% include "_overview_live.html" %}</div>
 <section>
   <h2>Анхаарах асуудал</h2>
   {% if problems %}

@@ -28,6 +28,8 @@ ADMIN_COOKIE = "__Host-khj_adm"
 PRE_AUTH_COOKIE = "__Host-khj_pre"
 INVITE_COOKIE = "__Host-khj_inv"
 TEMPLATES = Path(__file__).resolve().parent / "templates"
+# Fragments that pages re-fetch on a timer (hx-trigger="every …"): they are not user activity.
+POLL_PATHS = frozenset({"/email/status", "/overview/live"})
 
 ROLE_LABELS = {"owner": "Эзэмшигч", "admin": "Админ", "cashier": "Кассчин", "viewer": "Үзэгч"}
 WEEKDAYS = ["Да", "Мя", "Лх", "Пү", "Ба", "Бя", "Ня"]
@@ -146,7 +148,8 @@ def get_rt(request: Request) -> Runtime:
 
 async def admin_ctx(request: Request, rt: Annotated[Runtime, Depends(get_rt)]) -> Ctx:
     token = request.cookies.get(ADMIN_COOKIE)
-    sess = await load_session(rt.sm, token, utcnow()) if token else None
+    touch = request.url.path not in POLL_PATHS
+    sess = await load_session(rt.sm, token, utcnow(), touch=touch) if token else None
     if sess is None:
         raise LoginRequiredError
     async with tenant_session(rt.sm, sess.tenant_id) as s:

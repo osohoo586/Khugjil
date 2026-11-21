@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -51,6 +51,16 @@ async def _targets(deps: DeliveryDeps, s: AsyncSession, txn: Transaction) -> lis
     return eligible_targets(snap, deps.now(), agent_enabled=deps.agent_enabled)
 
 
+# An income the server saw this long after the bank's own time arrived late (Gmail retried while
+# the server was off). Cashiers must not take it for a payment that just happened: the device
+# lists it silently and no Web Push goes out.
+LATE_AFTER = timedelta(minutes=10)
+
+
+def is_late(txn: Transaction) -> bool:
+    return txn.received_at - txn.txn_at > LATE_AFTER
+
+
 async def fanout(deps: DeliveryDeps, tenant_id: uuid.UUID, txn_id: uuid.UUID) -> list[uuid.UUID]:
     created: list[uuid.UUID] = []
     async with tenant_session(deps.sessionmaker, tenant_id) as s:
@@ -70,7 +80,7 @@ async def fanout(deps: DeliveryDeps, tenant_id: uuid.UUID, txn_id: uuid.UUID) ->
                         PushSubscription.shift_id == t.shift_id,
                     )
                 )
-                channels = ["sse", "webpush"] if has_push else ["sse"]
+                channels = ["sse", "webpush"] if has_push and not is_late(txn) else ["sse"]
             for channel in channels:
                 new_id = await s.scalar(
                     insert(Delivery)
@@ -113,6 +123,7 @@ async def notification_for(
         description=description,
         account_alias=alias,
         show_alias=account_count > 1,
+        late=is_late(txn),
     )
 
 

@@ -64,7 +64,7 @@ def pages() -> dict[str, tuple[str, dict[str, Any]]]:
         "overview": ("overview.html", {
             "last_ok": datetime(2026, 10, 15, 0, 37, tzinfo=UTC), "forwarding_ok": True,
             "devices_online": 3, "devices_total": 4, "offline_names": ["Касс-2"], "failed": 0,
-            "today_count": 42, "today_total": Decimal("1284500"),
+            "today_count": 42, "today_total": Decimal("1284500"), "recent": rows[:3],
             "problems": [("Касс-2 төхөөрөмж нэг цагаас дээш холбогдоогүй байна.", "/devices"),
                          ("Г. Туяа урилгаа хүлээн аваагүй байна.", "/members")],
         }),

@@ -116,6 +116,9 @@ async def auto_end_shifts(sm: SessionMaker, bus: EventBus, now: datetime) -> int
             tenant = await s.get(Tenant, tenant_id)
             if tenant is None:  # pragma: no cover
                 continue
+            if not tenant.cashier_pin_shifts:
+                # Devices open their own shift again at once; duty is still checked per delivery.
+                continue
             open_shifts = list(
                 (await s.execute(select(Shift).where(Shift.ended_at.is_(None)))).scalars()
             )
