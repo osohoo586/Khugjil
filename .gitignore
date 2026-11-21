@@ -34,5 +34,8 @@ deploy/agent-releases/*
 !deploy/agent-releases/README.md
 .dev/
 
+# Personal Claude Code settings (hooks of this machine)
+.claude/settings.local.json
+
 # wrangler local state (cf-worker)
 cf-worker/.wrangler/
