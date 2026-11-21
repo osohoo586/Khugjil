@@ -6,13 +6,18 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE="$ROOT/.dev/public"
 
-# Each recorded process together with its child (`uv run` may leave the child running); never the
-# local demo stack's processes, which run the same commands.
-for name in tunnel api worker; do
+# Each recorded restart loop, then what it was running (and that process's own children, since
+# `uv run` may leave its child running); never the local demo stack's processes, which run the
+# same commands. The loop goes first so it cannot start the process again.
+for name in tunnel api worker caffeinate; do
   if [ -f "$STATE/$name.pid" ]; then
     pid="$(cat "$STATE/$name.pid")"
-    pkill -P "$pid" 2>/dev/null
+    kids="$(pgrep -P "$pid" 2>/dev/null)"
     kill "$pid" 2>/dev/null
+    for kid in $kids; do
+      pkill -P "$kid" 2>/dev/null
+      kill "$kid" 2>/dev/null
+    done
     rm -f "$STATE/$name.pid"
   fi
 done

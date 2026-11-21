@@ -39,11 +39,19 @@ echo "· migrations"
 echo "· cashier bundle"
 (cd "$ROOT/cashier" && npm run build >/dev/null)
 
-start() {  # name, command...
-  local name=$1; shift
+# Each long-running process runs under a small loop that starts it again 3 s after it exits, so a
+# crash costs seconds, not the rest of the day. The pid file holds the loop; public-down.sh stops
+# the loop first and then its child.
+supervise() {  # name, dir, command...
+  local name=$1 dir=$2; shift 2
   if [ -f "$STATE/$name.pid" ] && kill -0 "$(cat "$STATE/$name.pid")" 2>/dev/null; then return; fi
-  (cd "$ROOT/server" && { nohup "$@" </dev/null >"$STATE/$name.log" 2>&1 & echo $! >"$STATE/$name.pid"; })
+  (cd "$dir" && {
+    nohup bash -c 'while :; do "$@"; code=$?; echo "$(date -u +%FT%TZ) exited ($code), restarting in 3 s" >&2; sleep 3; done' \
+      _ "$@" </dev/null >"$STATE/$name.log" 2>&1 &
+    echo $! >"$STATE/$name.pid"
+  })
 }
+start() { supervise "$1" "$ROOT/server" "${@:2}"; }
 echo "· api and worker"
 start api uv run uvicorn khugjil.web.app:production_app --factory --host 127.0.0.1 --port 8100
 start worker uv run khugjil worker
@@ -105,10 +113,13 @@ for host in "$ADMIN_HOST" "$APP_HOST"; do
   cloudflared tunnel --config "$STATE/cloudflared.yml" route dns --overwrite-dns "$TID" "$host" \
     >/dev/null 2>&1 || echo "  could not route $host (see: cloudflared tunnel route dns)"
 done
-if ! { [ -f "$STATE/tunnel.pid" ] && kill -0 "$(cat "$STATE/tunnel.pid")" 2>/dev/null; }; then
-  nohup cloudflared tunnel --no-autoupdate --config "$STATE/cloudflared.yml" run "$TUNNEL" \
-    </dev/null >"$STATE/tunnel.log" 2>&1 &
-  echo $! >"$STATE/tunnel.pid"
+supervise tunnel "$ROOT" cloudflared tunnel --no-autoupdate --config "$STATE/cloudflared.yml" run "$TUNNEL"
+
+# Keep the Mac from idle-sleeping while this runs (-i; -s also on mains power). Closing the lid
+# still sleeps it, and on battery it stops when the battery runs out: keep it plugged in and open.
+if ! { [ -f "$STATE/caffeinate.pid" ] && kill -0 "$(cat "$STATE/caffeinate.pid")" 2>/dev/null; }; then
+  nohup caffeinate -i -s </dev/null >/dev/null 2>&1 &
+  echo $! >"$STATE/caffeinate.pid"
 fi
 
 invite="$(grep '^owner_invite=' "$STATE/tenant.txt" | cut -d= -f2-)"
