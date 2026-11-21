@@ -99,9 +99,13 @@ export async function signIn(page: Page, shop: Shop): Promise<void> {
   await page.fill("input[name=login_name]", shop.login);
   await page.fill("input[name=password]", PASSWORD);
   await page.click("button[type=submit]");
-  await expect(page.locator("h1")).toHaveText("Баталгаажуулах код");
-  await page.fill("input[name=code]", await shop.code(page));
-  await page.click("button[type=submit]");
+  // A browser remembered after an earlier TOTP sign-in goes straight in (password only).
+  await expect(page.locator("h1")).toHaveText(/Баталгаажуулах код|Тойм/);
+  if ((await page.locator("h1").textContent()) === "Баталгаажуулах код") {
+    await expect(page.locator("input[name=remember_device]")).toBeChecked();
+    await page.fill("input[name=code]", await shop.code(page));
+    await page.click("button[type=submit]");
+  }
   await expect(page.locator("main h1")).toHaveText("Тойм");
 }
 

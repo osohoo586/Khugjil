@@ -32,6 +32,8 @@ code { font-size: var(--fs-sm); }
 .clock-time { color: var(--text); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
 .tenant { font-weight: var(--fw-semibold); font-size: var(--fs-md); line-height: var(--lh-tight); }
 .who { margin-top: auto; border-top: var(--border-w) solid var(--border); padding: var(--sp-2) var(--sp-1) 0; }
+.sidebar .who a { display: inline; min-height: 0; padding: 0; border: 0; color: var(--accent); text-decoration: underline; }
+.sidebar .who a[aria-current="page"] { background: none; font-weight: var(--fw-semibold); }
 .content { padding: var(--sp-4); max-width: 1200px; min-width: 0; }
 .content > section { margin-top: var(--sp-4); }
 

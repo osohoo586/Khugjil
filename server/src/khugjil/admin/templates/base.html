@@ -31,6 +31,7 @@
     <div class="who">
       <p>{{ ctx.member.display_name }}</p>
       <p class="muted small">{{ ctx.member.role | role }}</p>
+      <p class="small"><a href="/me/devices"{% if path == "/me/devices" %} aria-current="page"{% endif %}>Санасан төхөөрөмж</a></p>
       <form method="post" action="/logout">{{ ui.csrf() }}<button class="btn btn-link" type="submit">Гарах</button></form>
     </div>
   </aside>

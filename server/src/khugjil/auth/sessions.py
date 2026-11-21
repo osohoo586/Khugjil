@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete
 
 from khugjil.crypto import Crypto, Purpose, constant_time_eq, new_token, token_hash
-from khugjil.db.models import Session
+from khugjil.db.models import Session, TrustedDevice
 from khugjil.db.tenancy import Resolver, SessionMaker, tenant_session
 
 IDLE = timedelta(minutes=30)
@@ -110,5 +110,8 @@ async def end_session(sm: SessionMaker, sess: AdminSession) -> None:
 
 
 async def end_member_sessions(sm: SessionMaker, tenant_id: uuid.UUID, member_id: uuid.UUID) -> None:
+    """Sign the member out everywhere and forget every browser remembered for them (re-invite,
+    revoke): the next sign-in needs the new password and the TOTP code again."""
     async with tenant_session(sm, tenant_id) as s:
         await s.execute(delete(Session).where(Session.member_id == member_id))
+        await s.execute(delete(TrustedDevice).where(TrustedDevice.member_id == member_id))

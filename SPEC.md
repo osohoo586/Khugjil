@@ -331,6 +331,9 @@ Format rules:
 ## 10. Auth & web security
 
 - Passwords hashed with argon2id. TOTP 2FA mandatory for owners and admins.
+  Owner's choice (2026-11-21): after a TOTP sign-in a browser may be remembered
+  for 30 days and then asks only for the password; step-up for sensitive
+  actions always asks for the code, and re-invite or revoke forgets the browser.
 - Session cookies: httpOnly, Secure, SameSite=Strict. CSRF protection.
 - Strict CSP (no inline scripts), HSTS. No third-party JS/CDN; fonts
   self-hosted.

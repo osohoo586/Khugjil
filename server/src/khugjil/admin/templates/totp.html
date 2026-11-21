@@ -6,6 +6,8 @@
 <form method="post" action="/login/totp" class="stack">
   <label class="field"><span class="field-label">Апп дээрх 6 оронтой код</span>
     <input name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="20" class="tabular"></label>
+  <label class="check"><input type="checkbox" name="remember_device" value="true" checked> Энэ төхөөрөмж дээр 30 хоног код асуухгүй</label>
+  <p class="field-hint">Дараагийн удаа энэ хөтчөөр нэвтрэхэд зөвхөн нууц үг асууна. Олон хүн ашигладаг компьютер дээр сонголтыг арилгана уу.</p>
   <button class="btn btn-primary" type="submit">Нэвтрэх</button>
 </form>
 <p class="muted small">Утсаа алдсан бол хадгалсан нөөц кодын аль нэгийг (жишээ нь ABCDE-12345) оруулна уу.</p>

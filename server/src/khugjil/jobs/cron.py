@@ -29,6 +29,7 @@ from khugjil.db.models import (
     TelegramLinkCode,
     Tenant,
     Transaction,
+    TrustedDevice,
 )
 from khugjil.db.tenancy import Resolver, SessionMaker, tenant_session
 from khugjil.delivery.notifier import SendTarget
@@ -198,6 +199,10 @@ async def purge(sm: SessionMaker, settings: Settings, now: datetime) -> dict[str
                 await s.execute(delete(Invite).where(Invite.expires_at < now - timedelta(days=7))),
             )
             add("session", await s.execute(delete(Session).where(Session.expires_at < now)))
+            add(
+                "trusted_device",
+                await s.execute(delete(TrustedDevice).where(TrustedDevice.expires_at < now)),
+            )
             add(
                 "device_credential",
                 await s.execute(delete(DeviceCredential).where(DeviceCredential.expires_at < now)),

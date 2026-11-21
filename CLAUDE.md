@@ -113,7 +113,7 @@ The deny-list (OTP, код, нууц үг, …) is checked on the subject and th
 - No LLM in the processing path. No link following.
 - Strict tenant isolation, proven by tests.
 - Consent revocation takes effect immediately.
-- Web: argon2id passwords, mandatory TOTP for owners and admins, CSRF protection, strict CSP with no inline scripts, HSTS, **no third-party JS or CDN**, self-hosted fonts.
+- Web: argon2id passwords, mandatory TOTP for owners and admins (a browser may be remembered for 30 days after a TOTP sign-in, `auth/trusted.py`; step-up always asks for the code), CSRF protection, strict CSP with no inline scripts, HSTS, **no third-party JS or CDN**, self-hosted fonts.
 
 ## Security review on every change
 

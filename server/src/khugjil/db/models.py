@@ -550,6 +550,23 @@ class Session(Base):
     ip_prefix: Mapped[str | None] = mapped_column(Text)
 
 
+class TrustedDevice(Base):
+    """A browser remembered after a TOTP sign-in (migration 0006): it skips only the code at
+    sign-in, never the password and never step-up."""
+
+    __tablename__ = "trusted_device"
+    __table_args__ = (UniqueConstraint("tenant_id", "id"), _fk("member_id", "member"))
+    id: Mapped[uuid.UUID] = _pk()
+    tenant_id: Mapped[uuid.UUID] = _tenant()
+    member_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
+    label: Mapped[str | None] = mapped_column(Text)
+    ip_prefix: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    last_used_at: Mapped[datetime] = _now()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
     __table_args__ = (

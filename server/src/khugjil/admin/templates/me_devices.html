@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}Санасан төхөөрөмж{% endblock %}
+{% block content %}
+<h1>Санасан төхөөрөмж</h1>
+<p class="lead">Эдгээр хөтчөөр нэвтрэхэд таны нууц үгийг л асууна, баталгаажуулах кодыг {{ days }} хоног асуухгүй. Имэйл хаяг солих, тохиргоо өөрчлөх зэрэг мэдрэг үйлдэлд код үргэлж асууна.</p>
+{% if notice %}<p class="notice notice-success" role="status">{{ notice }}</p>{% endif %}
+{% if devices %}
+<table class="table">
+  <thead><tr><th scope="col">Төхөөрөмж</th><th scope="col">Сүүлд ашигласан</th><th scope="col">Хүчинтэй</th><th scope="col" class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <tbody>
+  {% for d, current in devices %}
+  <tr>
+    <td>{{ d.label or "Хөтөч" }}{% if current %} {{ ui.badge("neutral", "Энэ төхөөрөмж") }}{% endif %}</td>
+    <td class="tabular nowrap">{{ d.last_used_at | dt }}</td>
+    <td class="tabular nowrap">{{ (d.expires_at | dt)[:10] }} хүртэл</td>
+    <td class="num">{{ ui.confirm_form("/me/devices/" ~ d.id ~ "/forget", "Мартах", (d.label or "Хөтөч") ~ " төхөөрөмжийг мартах уу? Дараа нэвтрэхэд баталгаажуулах код асууна.", "secondary") }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form method="post" action="/me/devices/forget" data-confirm="Бүх төхөөрөмжийг мартах уу? Дараа аль ч хөтчөөр нэвтрэхэд баталгаажуулах код асууна.">
+  {{ ui.csrf() }}
+  <button class="btn btn-danger" type="submit">Бүгдийг мартах</button>
+</form>
+{% else %}
+{{ ui.empty("Санасан төхөөрөмж алга", "Нэвтрэхдээ «30 хоног код асуухгүй» гэдгийг сонговол тухайн хөтөч энд харагдана.") }}
+{% endif %}
+{% endblock %}

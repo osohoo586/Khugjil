@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { acceptOwnerInvite, ADMIN, APP, confirmAndSubmit, Shop, signIn, watch } from "./helpers";
+import { acceptOwnerInvite, ADMIN, APP, confirmAndSubmit, PASSWORD, Shop, signIn, watch } from "./helpers";
 
 // Every admin form, submitted the way a real browser submits it (native form posts, HTMX, the
 // confirm dialog, step-up), plus the cashier side of a staff invite. A 403 or 5xx anywhere fails.
@@ -141,4 +141,25 @@ test("email: test notification, a second address, replacing and retiring (step-u
 test("audit log records the actions above", async () => {
   await page.goto(`${ADMIN}/audit`);
   expect(await page.locator("tbody tr").count()).toBeGreaterThanOrEqual(6);
+});
+
+test("remembered browser: back in with the password only, until forgotten", async () => {
+  async function signOutAndPassword(): Promise<void> {
+    await page.click("button:has-text('Гарах')");
+    await expect(page).toHaveURL(new RegExp(`${ADMIN}/login`));
+    await page.fill("input[name=login_name]", shop.login);
+    await page.fill("input[name=password]", PASSWORD);
+    await page.click("button[type=submit]");
+  }
+  await page.goto(`${ADMIN}/`);
+  await signOutAndPassword();
+  await expect(page.locator("main h1")).toHaveText("Тойм"); // no code this time
+
+  await page.goto(`${ADMIN}/me/devices`);
+  await expect(page.locator("tbody")).toContainText("Энэ төхөөрөмж");
+  await confirmAndSubmit(page, page.locator("button:has-text('Бүгдийг мартах')"));
+  await expect(page.locator(".notice-success")).toContainText("Төхөөрөмжийг мартлаа.");
+
+  await signOutAndPassword();
+  await expect(page.locator("h1")).toHaveText("Баталгаажуулах код");
 });

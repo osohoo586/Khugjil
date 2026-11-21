@@ -6,7 +6,7 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 
@@ -33,9 +33,18 @@ from khugjil.auth.secrets import (
     verify_secret,
     verify_totp,
 )
-from khugjil.auth.sessions import create_session, end_session, mark_stepped_up
+from khugjil.auth.sessions import create_session, end_session, ip_prefix, mark_stepped_up
+from khugjil.auth.trusted import (
+    TRUST_COOKIE,
+    TRUST_DAYS,
+    forget,
+    is_current,
+    list_for,
+    recognise,
+    remember,
+)
 from khugjil.crypto import field_aad, new_token, token_hash
-from khugjil.db.models import Member, RecoveryCode, TenantTermsAcceptance
+from khugjil.db.models import AuditLog, Member, RecoveryCode, TenantTermsAcceptance
 from khugjil.db.tenancy import tenant_session
 from khugjil.logs import get_logger
 from khugjil.ratelimit import RateLimiter
@@ -122,6 +131,36 @@ async def login_submit(
             member.login_locked_until = lockout_until(member.login_failures, now)
             return page("login.html", 401, error=LOGIN_ERROR)
         member.login_failures, member.login_locked_until = 0, None
+        # A browser remembered after an earlier TOTP sign-in skips the code (never the
+        # password). Its session is not stepped up: sensitive actions still ask for the code.
+        client = request.client.host if request.client else None
+        device = (
+            await recognise(s, member_id, request.cookies.get(TRUST_COOKIE), now)
+            if member.totp_secret_enc is not None
+            else None
+        )
+        if device is not None:
+            # Signing in without the code is visible to the owner in the audit log.
+            s.add(
+                AuditLog(
+                    tenant_id=tenant_id,
+                    actor_kind="member",
+                    actor_id=member_id,
+                    action="login.remembered",
+                    object_type="trusted_device",
+                    object_id=device.id,
+                    object_label=device.label,
+                    ip_prefix=ip_prefix(client),
+                )
+            )
+    if device is not None:
+        get_logger().info("admin.login_remembered_browser")
+        token = await create_session(
+            rt.sm, tenant_id, member_id, now=now, ip=client, stepped_up=False
+        )
+        response = redirect("/")
+        set_cookie(response, ADMIN_COOKIE, token)
+        return response
     key = await _redis_put(rt, "preauth", {"t": str(tenant_id), "m": str(member_id)}, PRE_AUTH_TTL)
     response = redirect("/login/totp")
     set_cookie(response, PRE_AUTH_COOKIE, key, PRE_AUTH_TTL)
@@ -167,7 +206,10 @@ async def _check_second_factor(
 
 @router.post("/login/totp")
 async def totp_submit(
-    request: Request, rt: Rt, code: Annotated[str, Form(max_length=20)]
+    request: Request,
+    rt: Rt,
+    code: Annotated[str, Form(max_length=20)],
+    remember_device: Annotated[bool, Form()] = False,
 ) -> Response:
     key = request.cookies.get(PRE_AUTH_COOKIE)
     data = await _redis_get(rt, "preauth", key)
@@ -180,11 +222,85 @@ async def totp_submit(
         return page("totp.html", 401, error="Баталгаажуулах код буруу байна.")
     await _redis_drop(rt, "preauth", key)
     ip = request.client.host if request.client else None
-    token = await create_session(rt.sm, tenant_id, member_id, now=utcnow(), ip=ip)
+    now = utcnow()
+    token = await create_session(rt.sm, tenant_id, member_id, now=now, ip=ip)
     response = redirect("/")
     set_cookie(response, ADMIN_COOKIE, token)
     response.delete_cookie(PRE_AUTH_COOKIE, path="/", secure=True, httponly=True, samesite="strict")
+    if remember_device:
+        async with tenant_session(rt.sm, tenant_id) as s:
+            trust, row = await remember(
+                s,
+                tenant_id,
+                member_id,
+                now=now,
+                user_agent=request.headers.get("user-agent"),
+                ip=ip,
+            )
+            s.add(
+                AuditLog(
+                    tenant_id=tenant_id,
+                    actor_kind="member",
+                    actor_id=member_id,
+                    action="trusted.remember",
+                    object_type="trusted_device",
+                    object_id=row.id,
+                    object_label=row.label,
+                    ip_prefix=ip_prefix(ip),
+                    meta={"days": TRUST_DAYS},
+                )
+            )
+        set_cookie(response, TRUST_COOKIE, trust, TRUST_DAYS * 86400)
     return response
+
+
+# ---------------------------------------------------------------- remembered browsers
+
+
+@router.get("/me/devices", response_class=HTMLResponse)
+async def my_devices(ctx: CtxDep, notice: str | None = None) -> HTMLResponse:
+    async with ctx.session() as s:
+        rows = await list_for(s, ctx.member.id, utcnow())
+    cookie = ctx.request.cookies.get(TRUST_COOKIE)
+    devices = [(r, is_current(r, cookie)) for r in rows]
+    return ctx.render(
+        "me_devices.html",
+        devices=devices,
+        days=TRUST_DAYS,
+        notice="Төхөөрөмжийг мартлаа. Дараа нэвтрэхэд баталгаажуулах код асууна."
+        if notice == "forgotten"
+        else None,
+    )
+
+
+async def _forget(ctx: CtxDep, device_id: uuid.UUID | None) -> Response:
+    async with ctx.session() as s:
+        count = await forget(s, ctx.member.id, device_id)
+        if device_id is not None and count == 0:
+            raise HTTPException(404)
+        await ctx.audit(
+            s,
+            "trusted.forget",
+            object_type="trusted_device",
+            object_id=device_id,
+            meta={"count": count},
+        )
+    response = redirect("/me/devices?notice=forgotten")
+    if device_id is None:
+        response.delete_cookie(
+            TRUST_COOKIE, path="/", secure=True, httponly=True, samesite="strict"
+        )
+    return response
+
+
+@router.post("/me/devices/{device_id}/forget")
+async def my_device_forget(ctx: CtxDep, device_id: uuid.UUID) -> Response:
+    return await _forget(ctx, device_id)
+
+
+@router.post("/me/devices/forget")
+async def my_devices_forget_all(ctx: CtxDep) -> Response:
+    return await _forget(ctx, None)
 
 
 @router.post("/logout")

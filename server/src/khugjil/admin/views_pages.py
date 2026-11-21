@@ -104,6 +104,7 @@ AUDIT_LABELS = {
     "inbound.label": "Хүлээн авах хаягийн нэр өөрчилсөн",
     "inbound.retire": "Хүлээн авах хаяг хассан",
     "inbound.rotate": "Хүлээн авах хаяг сольсон",
+    "login.remembered": "Санасан төхөөрөмжөөр кодгүй нэвтэрсэн",
     "member.invite": "Хэрэглэгч урьсан",
     "member.reinvite": "Шинэ урилга үүсгэсэн",
     "member.revoke": "Хэрэглэгчийн эрх цуцалсан",
@@ -114,6 +115,8 @@ AUDIT_LABELS = {
     "settings.update": "Тохиргоо өөрчилсөн",
     "telegram.call_failed": "Telegram руу илгээж чадаагүй",
     "telegram.link_code": "Telegram холбох код үүсгэсэн",
+    "trusted.forget": "Санасан төхөөрөмжийг мартсан",
+    "trusted.remember": "Төхөөрөмжийг 30 хоног санасан",
 }
 
 
