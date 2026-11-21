@@ -2,6 +2,10 @@
 # Reads the per-Mac files in .dev/public (site.sh, bank.sh, generated secrets); prints nothing secret.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE="$ROOT/.dev/public"
+# The live code is a git worktree pinned to one commit (scripts/public-deploy.sh), never this
+# checkout: editing, building or switching branches here cannot reach the running site, and a
+# crash-restart reloads the same commit that was migrated for.
+RELEASE="$ROOT/.dev/release"
 mkdir -p "$STATE"
 chmod 700 "$STATE"
 

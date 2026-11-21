@@ -25,6 +25,8 @@ docker stop khugjil-dev-caddy khugjil-dev-redis khugjil-dev-postgres >/dev/null 
 if [ "${1:-}" = "--wipe" ]; then
   docker rm -v khugjil-dev-caddy khugjil-dev-redis khugjil-dev-postgres >/dev/null 2>&1
   docker volume rm khugjil-dev-caddy-data >/dev/null 2>&1
-  rm -rf "$STATE"
+  # Only the demo stack's own files. .dev/public (the live site's keys), .dev/releases (its code)
+  # and .dev/security (assessments) live under .dev too and must survive a demo wipe.
+  find "$STATE" -maxdepth 1 -type f -delete
 fi
 echo "Stopped."

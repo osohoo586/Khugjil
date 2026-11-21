@@ -8,11 +8,18 @@
 # keys generated on this Mac into .dev/public/ (never committed, never printed). Real bank data
 # arrives here, so it runs with production settings (no dev pages). Nothing listens on a public
 # interface: the tunnel connects outwards and reaches Caddy on 127.0.0.1:8180 only.
-# Stop with scripts/public-down.sh. Guide: docs/mac-server.md.
+# Stop with scripts/public-down.sh. Deploy a new commit with scripts/public-deploy.sh, which ends by
+# running this script. Guide: docs/mac-server.md.
 set -euo pipefail
 
 # shellcheck source=public-env.sh
 . "$(cd "$(dirname "$0")" && pwd)/public-env.sh"
+
+# Code comes only from the pinned release (.dev/release -> .dev/releases/<commit>), resolved once so
+# every process and mount below uses that one commit.
+[ -d "$RELEASE/server" ] || { echo "No release yet: run scripts/public-deploy.sh"; exit 1; }
+CODE="$(cd "$RELEASE" && pwd -P)"
+echo "· release $(basename "$CODE")"
 
 container() {  # name, image, extra docker run args...
   local name=$1 image=$2; shift 2
@@ -34,10 +41,13 @@ WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'khugjil_app') \gexec
 SQL
 
 echo "· migrations"
-(cd "$ROOT/server" && uv run khugjil migrate >/dev/null)
+# Before any api/worker of this release starts: the restart loops below only ever run this code.
+(cd "$CODE/server" && uv run --frozen khugjil migrate >/dev/null)
 
-echo "· cashier bundle"
-(cd "$ROOT/cashier" && npm run build >/dev/null)
+if [ ! -f "$CODE/cashier/dist/index.html" ]; then
+  echo "· cashier bundle"
+  (cd "$CODE/cashier" && npm run build >/dev/null)
+fi
 
 # Each long-running process runs under a small loop that starts it again 3 s after it exits, so a
 # crash costs seconds, not the rest of the day. The pid file holds the loop; public-down.sh stops
@@ -51,16 +61,19 @@ supervise() {  # name, dir, command...
     echo $! >"$STATE/$name.pid"
   })
 }
-start() { supervise "$1" "$ROOT/server" "${@:2}"; }
+start() { supervise "$1" "$CODE/server" "${@:2}"; }
 echo "· api and worker"
-start api uv run uvicorn khugjil.web.app:production_app --factory --host 127.0.0.1 --port 8100
-start worker uv run khugjil worker
+start api uv run --frozen uvicorn khugjil.web.app:production_app --factory --host 127.0.0.1 --port 8100
+start worker uv run --frozen khugjil worker
 
 echo "· caddy (http on 127.0.0.1:8180, behind the tunnel)"
+# Recreated on every start: its mounts are fixed when the container is created, and they must
+# point at this release (Caddy keeps no state here: plain http behind the tunnel).
+docker rm -f khugjil-public-caddy >/dev/null 2>&1 || true
 container khugjil-public-caddy caddy:2-alpine -p 127.0.0.1:8180:8180 \
   -e KHJ_APP_HOSTNAME="$APP_HOST" -e KHJ_ADMIN_HOSTNAME="$ADMIN_HOST" \
-  -v "$ROOT/deploy/Caddyfile.public:/etc/caddy/Caddyfile:ro" \
-  -v "$ROOT/cashier/dist:/srv/cashier:ro" \
+  -v "$CODE/deploy/Caddyfile.public:/etc/caddy/Caddyfile:ro" \
+  -v "$CODE/cashier/dist:/srv/cashier:ro" \
   --add-host host.docker.internal:host-gateway
 for _ in $(seq 1 30); do
   code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $ADMIN_HOST" http://127.0.0.1:8180/login || true)
@@ -71,7 +84,7 @@ done
 
 if [ ! -f "$STATE/tenant.txt" ]; then
   echo "· your shop"
-  (cd "$ROOT/server" && uv run khugjil tenant create --name "${KHJ_SHOP_NAME:-Миний дэлгүүр}") \
+  (cd "$CODE/server" && uv run --frozen khugjil tenant create --name "${KHJ_SHOP_NAME:-Миний дэлгүүр}") \
     | grep -E '^(tenant_id|inbound_address|owner_invite)=' >"$STATE/tenant.txt"
   chmod 600 "$STATE/tenant.txt"
 fi

@@ -33,7 +33,7 @@ cd server && uv run khugjil {keys generate|migrate|smtp|worker|telegram set-webh
 ```
 
 **Mac-server deployment (real bank data).** This Mac serves the live site until a VPS exists. `docs/mac-server.md` is the Mongolian guide.
-- `scripts/public-up.sh` starts the stack and `scripts/public-down.sh` stops it. The path is Cloudflare Tunnel → Caddy on 127.0.0.1:8180, and inbound mail goes Cloudflare Email Routing → `cf-worker` → `/hooks/cf`.
+- `scripts/public-deploy.sh [ref]` deploys a commit: the live stack runs from a pinned worktree (`.dev/release` -> `.dev/releases/<commit>`), never from this checkout, so edits, builds and branch switches here cannot reach it. It prepares the release, stops, migrates, then starts; the restart loops only ever reload that commit. Never point the live stack at the working tree. `scripts/public-up.sh` starts the current release (e.g. after a reboot) and `scripts/public-down.sh` stops it. The path is Cloudflare Tunnel → Caddy on 127.0.0.1:8180, and inbound mail goes Cloudflare Email Routing → `cf-worker` → `/hooks/cf`.
 - This stack is separate from the `dev-up.sh` demo: it has its own containers and volumes and runs with production settings.
 - Keys and per-site settings (`bank.sh`, `site.sh`) live in the gitignored `.dev/public/`. Never print them.
 - `scripts/check-email.sh <file.eml> [--deliver]` runs a saved bank email through the real checks. It prints only outcomes and structure, never content.
