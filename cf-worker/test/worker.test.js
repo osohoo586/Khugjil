@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import worker, { MAX_MESSAGE_BYTES, outcome, sign } from "../src/index.js";
+import worker, { MAX_MESSAGE_BYTES, outcome, paused, sign } from "../src/index.js";
 
 const vectors = JSON.parse(readFileSync(new URL("../../shared/cf_hook_vectors.json", import.meta.url), "utf8"));
 const env = { KHJ_CF_INGEST_SECRET: "test-cf-secret-not-real", KHJ_HOOK_URL: "https://app.khugjil.test/hooks/cf" };
@@ -80,4 +80,21 @@ test("duplicates are fine, oversized mail is rejected, failures ask the sender t
     assert.equal(calls.length, 0);
   });
   await assert.rejects(worker.email(fakeMessage("x"), {}), /not configured/);
+});
+
+test("paused: accepts and discards without calling the server, so Gmail sends no bounces", async () => {
+  assert.equal(paused({}), false);
+  assert.equal(paused({ KHJ_PAUSED: "0" }), false);
+  assert.equal(paused({ KHJ_PAUSED: "1" }), true);
+
+  await withFetch(530, async (calls) => {
+    const msg = fakeMessage("x");
+    await worker.email(msg, Object.assign({}, env, { KHJ_PAUSED: "1" }));
+    assert.equal(calls.length, 0);
+    assert.equal(msg.rejected, null);
+  });
+  // Not paused, the same outage still asks the sender to retry.
+  await withFetch(530, async () => {
+    await assert.rejects(worker.email(fakeMessage("x"), Object.assign({}, env, { KHJ_PAUSED: "0" })), /hook status 530/);
+  });
 });

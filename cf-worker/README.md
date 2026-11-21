@@ -47,6 +47,12 @@ pass by itself. Check one real forwarded email on **Имэйл холболт** 
 | 409 (same delivery already taken) | done |
 | 413 / message over 256 KB | rejected |
 | 401, 404 (secret or setting missing), 429, 5xx, network | throws, so Email Routing answers with a temporary failure and Gmail retries |
+| any, while deployed with `--var KHJ_PAUSED:1` | not called; the message is accepted and discarded |
+
+**Pause while the server is off for a long time.** Gmail keeps retrying a failing forward and
+sends the account owner delivery notices about it, for every bank email. Deploy with
+`--var KHJ_PAUSED:1` before a long shutdown and with `--var KHJ_PAUSED:0` after restarting the
+server. While paused, no notifications reach the cashier; the originals stay in Gmail.
 
 `npm test` runs the Worker tests with Node only (no dependencies). The signature is checked against
 `shared/cf_hook_vectors.json`, which the server's tests use too.

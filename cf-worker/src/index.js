@@ -25,8 +25,16 @@ export function outcome(status) {
   return "retry"; // 401/404 (misconfigured secret), 429, 5xx: let the sender retry later
 }
 
+/** True when the server is deliberately switched off (deploy with `--var KHJ_PAUSED:1`). */
+export function paused(env) {
+  return env.KHJ_PAUSED === "1";
+}
+
 export default {
   async email(message, env) {
+    // While paused, accept and discard: retrying against a stopped server only makes Gmail send
+    // the owner a delivery-failure notice for every bank email. The original stays in Gmail.
+    if (paused(env)) return;
     if (!env.KHJ_CF_INGEST_SECRET || !env.KHJ_HOOK_URL) throw new Error("not configured");
     if (message.rawSize > MAX_MESSAGE_BYTES) {
       message.setReject("Message too large");
