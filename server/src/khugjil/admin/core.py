@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import segno
 from fastapi import Depends, HTTPException, Request
@@ -22,6 +23,7 @@ from khugjil.db.models import AuditLog, Member, Tenant
 from khugjil.db.tenancy import tenant_session
 from khugjil.delivery.format import format_amount, format_datetime, format_time
 from khugjil.runtime import Runtime
+from khugjil.settings import BANK_TZ
 from khugjil.web.base import RuntimeHolder
 
 ADMIN_COOKIE = "__Host-khj_adm"
@@ -34,17 +36,55 @@ POLL_PATHS = frozenset({"/email/status", "/overview/live"})
 ROLE_LABELS = {"owner": "Эзэмшигч", "admin": "Админ", "cashier": "Кассчин", "viewer": "Үзэгч"}
 WEEKDAYS = ["Да", "Мя", "Лх", "Пү", "Ба", "Бя", "Ня"]
 
-NAV = [
-    ("/", "Тойм", ("owner", "admin", "viewer")),
-    ("/accounts", "Дансууд", ("owner", "admin")),
-    ("/groups", "Бүлгүүд", ("owner", "admin")),
-    ("/members", "Хэрэглэгчид", ("owner", "admin")),
-    ("/devices", "Төхөөрөмжүүд", ("owner", "admin")),
-    ("/email", "Имэйл холболт", ("owner",)),
-    ("/history", "Гүйлгээний түүх", ("owner", "admin", "viewer")),
-    ("/settings", "Тохиргоо", ("owner", "admin")),
-    ("/audit", "Аудит лог", ("owner", "admin")),
+WEEKDAY_NAMES = ["Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба", "Ням"]
+_ALL = ("owner", "admin", "viewer")
+_MANAGERS = ("owner", "admin")
+
+# Five sections (owner's request, 2026-11-21: fewer, clearer choices). Set-up pages that are
+# rarely visited live as tabs under "Тохиргоо"; every URL stays what it was.
+NAV: list[tuple[str, str, tuple[str, ...]]] = [
+    ("/", "Тойм", _ALL),
+    ("/history", "Гүйлгээ", _ALL),
+    ("/devices", "Төхөөрөмж", _MANAGERS),
+    ("/members", "Хэрэглэгчид", _MANAGERS),
+    ("/settings", "Тохиргоо", _MANAGERS),
 ]
+SETTINGS_TABS: list[tuple[str, str, tuple[str, ...]]] = [
+    ("/settings", "Ерөнхий", _MANAGERS),
+    ("/accounts", "Дансууд", _MANAGERS),
+    ("/groups", "Бүлгүүд", _MANAGERS),
+    ("/email", "Банкны имэйл", ("owner",)),
+    ("/audit", "Аудит лог", _MANAGERS),
+]
+
+
+def _under(path: str, href: str) -> bool:
+    return path == href or (href != "/" and path.startswith(href + "/"))
+
+
+def nav_items(role: str, path: str) -> list[tuple[str, str, bool]]:
+    """(href, label, current) for the sidebar; a settings tab marks "Тохиргоо" current."""
+    in_settings = any(_under(path, href) for href, _, _ in SETTINGS_TABS)
+    return [
+        (href, label, (href == "/settings" and in_settings) or _under(path, href))
+        for href, label, roles in NAV
+        if role in roles
+    ]
+
+
+def settings_tabs(role: str, path: str) -> list[tuple[str, str, bool]]:
+    """The tab row shown above every settings page, or [] elsewhere."""
+    tabs = [
+        (href, label, _under(path, href)) for href, label, roles in SETTINGS_TABS if role in roles
+    ]
+    return tabs if any(current for _, _, current in tabs) else []
+
+
+def ub_now_parts(now: datetime | None = None) -> tuple[str, str]:
+    """("2026.11.21, Баасан", "14:05") in the bank's time zone, for the sidebar clock."""
+    local = (now or datetime.now(UTC)).astimezone(ZoneInfo(BANK_TZ))
+    return f"{local:%Y.%m.%d}, {WEEKDAY_NAMES[local.weekday()]}", f"{local:%H:%M}"
+
 
 env = Environment(
     loader=FileSystemLoader(TEMPLATES),
@@ -59,6 +99,7 @@ env.filters["hm"] = lambda v: format_time(v) if v else "—"
 env.filters["role"] = lambda r: ROLE_LABELS.get(r, r)
 env.filters["urlq"] = lambda v: quote(str(v), safe="")
 env.globals["WEEKDAYS"] = WEEKDAYS
+env.globals["ub_now_parts"] = ub_now_parts
 
 
 def utcnow() -> datetime:
@@ -108,8 +149,11 @@ class Ctx:
     def session(self) -> Any:
         return tenant_session(self.rt.sm, self.tenant_id)
 
-    def nav(self) -> list[tuple[str, str]]:
-        return [(href, label) for href, label, roles in NAV if self.role in roles]
+    def nav(self) -> list[tuple[str, str, bool]]:
+        return nav_items(self.role, self.request.url.path)
+
+    def tabs(self) -> list[tuple[str, str, bool]]:
+        return settings_tabs(self.role, self.request.url.path)
 
     def render(self, template: str, status: int = 200, **values: Any) -> HTMLResponse:
         html = env.get_template(template).render(ctx=self, path=self.request.url.path, **values)

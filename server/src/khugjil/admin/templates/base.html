@@ -16,21 +16,35 @@
 <a class="skip" href="#main">Үндсэн хэсэг рүү шилжих</a>
 <div class="layout">
   <aside class="sidebar">
-    <p class="tenant">{{ ctx.tenant.name }}</p>
+    <div class="sidebar-head">
+      <p class="tenant">{{ ctx.tenant.name }}</p>
+      {% set day, hm = ub_now_parts() %}
+      <p class="clock" data-clock><span class="clock-day">{{ day }}</span> <span class="clock-time">{{ hm }}</span></p>
+    </div>
     <nav aria-label="Үндсэн цэс">
       <ul>
-      {% for href, label in ctx.nav() %}
-        <li><a href="{{ href }}"{% if path == href or (href != "/" and path.startswith(href)) %} aria-current="page"{% endif %}>{{ label }}</a></li>
+      {% for href, label, current in ctx.nav() %}
+        <li><a href="{{ href }}"{% if current %} aria-current="page"{% endif %}>{{ label }}</a></li>
       {% endfor %}
       </ul>
     </nav>
     <div class="who">
       <p>{{ ctx.member.display_name }}</p>
-      <p class="muted">{{ ctx.member.role | role }}</p>
+      <p class="muted small">{{ ctx.member.role | role }}</p>
       <form method="post" action="/logout">{{ ui.csrf() }}<button class="btn btn-link" type="submit">Гарах</button></form>
     </div>
   </aside>
   <main id="main" class="content">
+    {% set tabs = ctx.tabs() %}
+    {% if tabs %}
+    <nav class="tabs" aria-label="Тохиргоо">
+      <ul>
+      {% for href, label, current in tabs %}
+        <li><a href="{{ href }}"{% if current %} aria-current="page"{% endif %}>{{ label }}</a></li>
+      {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 </div>

@@ -3,10 +3,10 @@
 {% block title %}Бүлгүүд{% endblock %}
 {% block content %}
 <h1>Бүлгүүд</h1>
-<p class="muted">Бүлэг нь аль данс руу орсон орлогыг аль хэрэглэгч, аль төхөөрөмж дээр харуулахыг тодорхойлно.</p>
+<p class="lead">Бүлэг нь аль данс руу орсон орлогыг аль хэрэглэгч, аль төхөөрөмж дээр харуулахыг тодорхойлно.</p>
 {% if groups %}
 <table class="table">
-  <thead><tr><th>Нэр</th><th>Төлөв</th><th class="num">Данс</th><th class="num">Хэрэглэгч</th><th class="num">Төхөөрөмж</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <thead><tr><th scope="col">Нэр</th><th scope="col">Төлөв</th><th scope="col" class="num">Данс</th><th scope="col" class="num">Хэрэглэгч</th><th scope="col" class="num">Төхөөрөмж</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
   <tbody>
   {% for g in groups %}
   <tr>
@@ -22,5 +22,5 @@
 {{ ui.empty("Бүлэг үүсгээгүй байна", "Доор бүлэг үүсгээд данс, хэрэглэгч, төхөөрөмжөө холбоно уу.") }}
 {% endif %}
 <h2>Бүлэг үүсгэх</h2>
-<form method="post" action="/groups" class="row-form">{{ ui.csrf() }}{{ ui.field("name", "Нэр", required=True, attrs={"maxlength": "60"}) }}<button class="btn btn-primary" type="submit">Үүсгэх</button></form>
+<form method="post" action="/groups" class="row-form">{{ ui.csrf() }}{{ ui.field("name", "Нэр", required=True, attrs={"maxlength": "60"}) }}<button class="btn btn-primary" type="submit">Бүлэг үүсгэх</button></form>
 {% endblock %}

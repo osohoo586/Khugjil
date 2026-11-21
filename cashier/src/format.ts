@@ -29,6 +29,20 @@ export function clock(now: Date): string {
   }).format(now);
 }
 
+const WEEKDAYS: Record<string, string> = {
+  Mon: "Даваа", Tue: "Мягмар", Wed: "Лхагва", Thu: "Пүрэв", Fri: "Баасан", Sat: "Бямба", Sun: "Ням",
+};
+const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", timeZone: "Asia/Ulaanbaatar",
+});
+
+/** "2026.11.21, Баасан": the date beside the clock, in the bank's time zone. */
+export function dayLabel(now: Date): string {
+  const p: Record<string, string> = {};
+  for (const part of DAY_FORMAT.formatToParts(now)) p[part.type] = part.value;
+  return `${p.year}.${p.month}.${p.day}, ${WEEKDAYS[p.weekday ?? ""] ?? ""}`;
+}
+
 /** Normalise what a cashier types into the verify box ("2 800", "2,800.00") to a decimal string. */
 export function parseAmountInput(raw: string): string | null {
   const cleaned = raw.replace(/[\s,₮]/g, "");

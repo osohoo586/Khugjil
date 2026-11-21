@@ -27,6 +27,11 @@
     if (!dialog) { if (window.confirm(form.dataset.confirm)) { form.dataset.confirmed = "1"; form.submit(); } return; }
     pendingForm = form;
     dialog.querySelector(".dialog-title").textContent = form.dataset.confirm;
+    // The confirm button repeats the action's own name ("Эрх цуцлах"), not a bare "Тийм".
+    var submitter = form.querySelector("button[type=submit]");
+    var ok = dialog.querySelector("[data-dialog-ok]");
+    ok.textContent = submitter && submitter.textContent.trim() ? submitter.textContent.trim() : "Тийм";
+    ok.className = "btn " + (submitter && submitter.classList.contains("btn-danger") ? "btn-danger" : "btn-primary");
     dialog.showModal();
   });
   if (dialog) {
@@ -58,6 +63,23 @@
       if (d) { event.preventDefault(); d.close(); window.location.reload(); }
     }
   });
+
+  // Sidebar clock: date, weekday and time in Ulaanbaatar, whatever the PC's own time zone.
+  var WEEKDAYS = { Mon: "Даваа", Tue: "Мягмар", Wed: "Лхагва", Thu: "Пүрэв", Fri: "Баасан", Sat: "Бямба", Sun: "Ням" };
+  var clockFormat = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Ulaanbaatar", year: "numeric", month: "2-digit", day: "2-digit",
+    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false
+  });
+  function tickClock() {
+    var el = document.querySelector("[data-clock]");
+    if (!el) return;
+    var p = {};
+    clockFormat.formatToParts(new Date()).forEach(function (part) { p[part.type] = part.value; });
+    el.querySelector(".clock-day").textContent = p.year + "." + p.month + "." + p.day + ", " + (WEEKDAYS[p.weekday] || "");
+    el.querySelector(".clock-time").textContent = p.hour + ":" + p.minute;
+  }
+  tickClock();
+  setInterval(tickClock, 10000);
 
   // Pairing code countdown.
   function startCountdowns(root) {

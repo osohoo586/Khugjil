@@ -2,7 +2,8 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}Тохиргоо{% endblock %}
 {% block content %}
-<h1>Тохиргоо</h1>
+<h1>Ерөнхий тохиргоо</h1>
+<p class="lead">Кассын дэлгэц, дуут мэдэгдэл, ээлж болон банкны имэйлийн хяналт.</p>
 {% if saved %}<p class="notice notice-success" role="status">Хадгаллаа.</p>{% endif %}
 {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="/settings" class="stack narrow">

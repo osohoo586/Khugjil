@@ -141,6 +141,8 @@ class InboundAddress(Base):
     local_part_hmac: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)
     local_part_enc: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    # Owner-chosen name, e.g. which Gmail account forwards here (migration 0005).
+    label: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _now()
     retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

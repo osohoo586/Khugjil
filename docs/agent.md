@@ -42,7 +42,7 @@ Debug builds print command names and API paths (never bodies or tokens) to stder
 ## Server side
 
 Agents are off until the server has `KHJ_AGENT_DEVICES_ENABLED=true` (see `docs/configuration.md`).
-Then the admin panel offers **Төрөл → Агент** on Төхөөрөмжүүд. `KHJ_AGENT_MIN_VERSION` makes the
+Then the admin panel offers **Төрөл → Агент** on the Төхөөрөмж page. `KHJ_AGENT_MIN_VERSION` makes the
 server answer 426 to older agents, which then run the updater.
 
 ## Releases and signed updates

@@ -14,7 +14,15 @@ from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import delete, func, select
 
-from khugjil.admin.core import Manager, Owner, Reader, redirect, require_stepup, utcnow
+from khugjil.admin.core import (
+    Manager,
+    Owner,
+    Reader,
+    StepUpRequiredError,
+    redirect,
+    require_stepup,
+    utcnow,
+)
 from khugjil.crypto import field_aad
 from khugjil.db.models import (
     Alert,
@@ -27,6 +35,7 @@ from khugjil.db.models import (
     ForwardingConfirmation,
     GroupAccount,
     GroupMember,
+    InboundAddress,
     IngestEvent,
     Member,
     RecipientGroup,
@@ -37,10 +46,16 @@ from khugjil.ingest.forwarding import CONFIRM_LINK
 from khugjil.ingest.pipeline import ALERT_FORWARDING_SILENT, ALERT_TEMPLATE_CHANGED
 from khugjil.ingest.reasons import Reason
 from khugjil.services.provisioning import (
+    LABEL_MAX,
+    MAX_ACTIVE_INBOUND,
+    InboundLimitError,
     account_suffix,
     add_bank_account,
-    current_inbound,
-    rotate_inbound,
+    add_inbound,
+    list_inbound,
+    rename_inbound,
+    replace_inbound,
+    retire_one_inbound,
 )
 from khugjil.services.shifts import end_open_shifts
 from khugjil.settings import BANK_TZ
@@ -71,6 +86,34 @@ REASON_LABELS = {
     Reason.FWD_CONFIRM_STORED: "Gmail-ийн баталгаажуулах код ирсэн",
     Reason.FWD_CONFIRM_UNRECOGNIZED: "Татгалзсан — Gmail-ийн баталгаажуулах имэйл танигдсангүй",
     Reason.FWD_CONFIRM_AUTH_FAIL: "Татгалзсан — Gmail-ийн имэйлийн DKIM баталгаажаагүй",
+}
+
+
+AUDIT_LABELS = {
+    "account.add": "Данс нэмсэн",
+    "account.auto_add": "Данс автоматаар нэмэгдсэн",
+    "account.active": "Данс идэвхжүүлсэн",
+    "account.inactive": "Данс идэвхгүй болгосон",
+    "consent.revoke": "Зөвшөөрөл цуцалсан",
+    "device.pairing_code": "Төхөөрөмж холбох код үүсгэсэн",
+    "device.revoke": "Төхөөрөмж цуцалсан",
+    "device.update": "Төхөөрөмж зассан",
+    "group.add": "Бүлэг үүсгэсэн",
+    "group.update": "Бүлэг зассан",
+    "inbound.add": "Хүлээн авах хаяг нэмсэн",
+    "inbound.label": "Хүлээн авах хаягийн нэр өөрчилсөн",
+    "inbound.retire": "Хүлээн авах хаяг хассан",
+    "inbound.rotate": "Хүлээн авах хаяг сольсон",
+    "member.invite": "Хэрэглэгч урьсан",
+    "member.reinvite": "Шинэ урилга үүсгэсэн",
+    "member.revoke": "Хэрэглэгчийн эрх цуцалсан",
+    "member.schedule_add": "Ажлын хуваарь нэмсэн",
+    "member.schedule_remove": "Ажлын хуваарь устгасан",
+    "member.update": "Хэрэглэгч зассан",
+    "notification.test": "Туршилтын мэдэгдэл илгээсэн",
+    "settings.update": "Тохиргоо өөрчилсөн",
+    "telegram.call_failed": "Telegram руу илгээж чадаагүй",
+    "telegram.link_code": "Telegram холбох код үүсгэсэн",
 }
 
 
@@ -188,7 +231,7 @@ async def overview(ctx: Reader) -> HTMLResponse:
     )
 
 
-RECENT_LIMIT = 5
+RECENT_LIMIT = 10
 
 
 async def _overview_live_state(ctx: Reader) -> dict[str, Any]:
@@ -396,7 +439,7 @@ async def group_save(
 async def _email_state(ctx: Any) -> dict[str, Any]:
     now = utcnow()
     async with ctx.session() as s:
-        address_local = await current_inbound(s, ctx.rt.crypto, ctx.tenant_id)
+        addresses = await list_inbound(s, ctx.rt.crypto, ctx.tenant_id)
         fwd = (
             await s.execute(
                 select(ForwardingConfirmation)
@@ -426,7 +469,11 @@ async def _email_state(ctx: Any) -> dict[str, Any]:
     # Either a numeric code or (current Gmail) Google's confirmation link for the owner to open.
     link = code if code and CONFIRM_LINK.fullmatch(code) else None
     return {
-        "address": f"{address_local}@{ctx.rt.settings.inbound_domain}" if address_local else None,
+        "addresses": [
+            (a.id, f"{a.local_part}@{ctx.rt.settings.inbound_domain}", a.label, a.created_at)
+            for a in addresses
+        ],
+        "max_addresses": MAX_ACTIVE_INBOUND,
         "fwd_code": code if code and code.isdigit() else None,
         "fwd_link": link,
         "fwd_expires": fwd.expires_at if fwd else None,
@@ -441,9 +488,33 @@ async def _email_state(ctx: Any) -> dict[str, Any]:
     }
 
 
+EMAIL_NOTICES = {
+    "test": "Туршилтын мэдэгдэл илгээлээ. Ээлжтэй төхөөрөмж болон таны Telegram дээр «Туршилт» "
+    "гэсэн мэдэгдэл харагдах ёстой.",
+    "added": "Шинэ хаяг нэмлээ. Gmail-ийн дамжуулалтыг энэ хаяг руу тохируулж, баталгаажуулна уу.",
+    "replaced": "Хаягийг солилоо. Хуучин хаяг хүчингүй болсон тул Gmail-ийн дамжуулалтыг шинэ "
+    "хаяг руу дахин тохируулна уу.",
+    "retired": "Хаягийг хаслаа. Энэ хаяг руу ирсэн имэйлийг цаашид хүлээн авахгүй.",
+    "renamed": "Нэрийг хадгаллаа.",
+}
+EMAIL_ERRORS = {
+    "limit": f"Нэг дор {MAX_ACTIVE_INBOUND}-аас олон хаяг идэвхтэй байж болохгүй. "
+    "Ашиглагдахгүй байгаа хаягаа эхлээд хасна уу.",
+    "last": "Сүүлийн хаягийг хасах боломжгүй. Банкны имэйл хүлээн авах өөр хаяг үлдэх ёстой. "
+    "Хаяг задарсан гэж үзвэл «Солих» товчийг ашиглана уу.",
+}
+
+
 @router.get("/email", response_class=HTMLResponse)
-async def email_page(ctx: Owner, notice: str | None = None) -> HTMLResponse:
-    return ctx.render("email.html", notice=notice, **await _email_state(ctx))
+async def email_page(
+    ctx: Owner, notice: str | None = None, error: str | None = None
+) -> HTMLResponse:
+    return ctx.render(
+        "email.html",
+        notice=EMAIL_NOTICES.get(notice or ""),
+        error=EMAIL_ERRORS.get(error or ""),
+        **await _email_state(ctx),
+    )
 
 
 @router.get("/email/status", response_class=HTMLResponse)
@@ -451,13 +522,85 @@ async def email_status(ctx: Owner) -> HTMLResponse:
     return ctx.render("_email_status.html", **await _email_state(ctx))
 
 
-@router.post("/email/rotate")
-async def email_rotate(ctx: Owner) -> Response:
-    require_stepup(ctx)
+def _email_stepup(ctx: Owner) -> None:
+    """Adding, replacing or retiring an inbound address changes where bank mail is accepted:
+    owner-only, with a fresh TOTP. After step-up the owner lands back on the page, not on the
+    POST-only route."""
+    if not ctx.sess.stepped_up:
+        raise StepUpRequiredError("/email")
+
+
+Label = Annotated[str, Form(max_length=LABEL_MAX)]
+
+
+@router.post("/email/addresses")
+async def email_address_add(ctx: Owner, label: Label = "") -> Response:
+    _email_stepup(ctx)
+    try:
+        async with ctx.session() as s:
+            row = await add_inbound(s, ctx.rt.crypto, ctx.tenant_id, label)
+            await ctx.audit(
+                s, "inbound.add", object_type="inbound_address", object_id=row.id, label=row.label
+            )
+    except InboundLimitError:
+        return redirect("/email?error=limit")
+    return redirect("/email?notice=added")
+
+
+@router.post("/email/addresses/{address_id}/replace")
+async def email_address_replace(ctx: Owner, address_id: uuid.UUID) -> Response:
+    _email_stepup(ctx)
     async with ctx.session() as s:
-        await rotate_inbound(s, ctx.rt.crypto, ctx.tenant_id)
-        await ctx.audit(s, "inbound.rotate", object_type="inbound_address")
-    return redirect("/email")
+        new = await replace_inbound(s, ctx.rt.crypto, ctx.tenant_id, address_id)
+        if new is None:
+            raise HTTPException(404)
+        await ctx.audit(
+            s,
+            "inbound.rotate",
+            object_type="inbound_address",
+            object_id=new.id,
+            label=new.label,
+            meta={"replaced": str(address_id)},
+        )
+    return redirect("/email?notice=replaced")
+
+
+@router.post("/email/addresses/{address_id}/retire")
+async def email_address_retire(ctx: Owner, address_id: uuid.UUID) -> Response:
+    _email_stepup(ctx)
+    try:
+        async with ctx.session() as s:
+            row = await retire_one_inbound(s, ctx.tenant_id, address_id)
+            if row is None:
+                raise HTTPException(404)
+            await ctx.audit(
+                s,
+                "inbound.retire",
+                object_type="inbound_address",
+                object_id=address_id,
+                label=row.label,
+            )
+    except InboundLimitError:
+        return redirect("/email?error=last")
+    return redirect("/email?notice=retired")
+
+
+@router.post("/email/addresses/{address_id}/label")
+async def email_address_label(ctx: Owner, address_id: uuid.UUID, label: Label = "") -> Response:
+    async with ctx.session() as s:
+        old = await s.scalar(select(InboundAddress.label).where(InboundAddress.id == address_id))
+        row = await rename_inbound(s, address_id, label)
+        if row is None:
+            raise HTTPException(404)
+        await ctx.audit(
+            s,
+            "inbound.label",
+            object_type="inbound_address",
+            object_id=address_id,
+            label=row.label,
+            meta={"old": old, "new": row.label},
+        )
+    return redirect("/email?notice=renamed")
 
 
 @router.post("/email/test")
@@ -753,5 +896,10 @@ async def audit_page(ctx: Manager, page: int = 1) -> HTMLResponse:
         )
         names = {m.id: m.display_name for m in (await s.execute(select(Member))).scalars()}
     return ctx.render(
-        "audit.html", rows=rows, names=names, page=page, pages=max(1, -(-int(total) // PAGE_SIZE))
+        "audit.html",
+        rows=rows,
+        names=names,
+        labels=AUDIT_LABELS,
+        page=page,
+        pages=max(1, -(-int(total) // PAGE_SIZE)),
     )

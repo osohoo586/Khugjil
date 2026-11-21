@@ -1,18 +1,18 @@
 {% import "_ui.html" as ui with context %}
-<section>
-  <h2>Өнөөдөр</h2>
-  <p class="today"><span class="tabular">{{ today_count }} гүйлгээ</span><span class="tabular num">{{ today_total | amount }}</span></p>
-</section>
-<section>
-  <h2>Сүүлийн орлого</h2>
+<section aria-labelledby="recent-title">
+  <div class="section-head">
+    <h2 id="recent-title">Сүүлийн орлого</h2>
+    <p class="section-meta">Өнөөдөр <span class="tabular">{{ today_count }}</span> гүйлгээ, <strong class="tabular">{{ today_total | amount }}</strong></p>
+  </div>
   {% if recent %}
   <table class="table">
-    <thead><tr><th>Огноо, цаг</th><th>Данс</th><th class="num">Дүн</th><th>Утга</th></tr></thead>
+    <thead><tr><th scope="col">Огноо, цаг</th><th scope="col">Данс</th><th scope="col">Утга</th><th scope="col" class="num">Дүн</th></tr></thead>
     <tbody>
-    {% for r in recent %}<tr><td class="tabular">{{ r.txn_at | dt }}</td><td>{{ r.account }}</td><td class="num tabular">{{ r.amount | amount(r.currency) }}</td><td class="truncate" title="{{ r.description }}">{{ r.description }}</td></tr>{% endfor %}
+    {% for r in recent %}<tr><td class="tabular nowrap">{{ r.txn_at | dt }}</td><td class="nowrap">{{ r.account }}</td><td class="truncate" title="{{ r.description }}">{{ r.description }}</td><td class="num tabular nowrap">{{ r.amount | amount(r.currency) }}</td></tr>{% endfor %}
     </tbody>
   </table>
+  <p class="table-foot"><a href="/history">Бүх гүйлгээг харах</a></p>
   {% else %}
-  {{ ui.empty("Орлого алга", "Орлого орж ирэхэд энд харагдана.") }}
+  {{ ui.empty("Орлого алга", "Банкнаас орлогын имэйл ирэхэд энд харагдана.") }}
   {% endif %}
 </section>

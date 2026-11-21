@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
-{% block title %}Гүйлгээний түүх{% endblock %}
+{% block title %}Гүйлгээ{% endblock %}
 {% block content %}
-<div class="title-row"><h1>Гүйлгээний түүх</h1>
+<div class="title-row"><h1>Гүйлгээ</h1>
 {% if ctx.role in ("owner", "admin") %}<a class="btn btn-secondary" href="/history.csv?date_from={{ f.date_from | urlq }}&date_to={{ f.date_to | urlq }}&account={{ f.account | urlq }}&amount_min={{ f.amount_min | urlq }}&amount_max={{ f.amount_max | urlq }}">CSV татах</a>{% endif %}</div>
+<p class="lead">Хүлээн авсан бүх орлого. Огноо, данс, дүнгээр шүүнэ.</p>
 <form method="get" action="/history" class="row-form filters">
   {{ ui.field("date_from", "Эхлэх огноо", value=f.date_from, type="date") }}
   {{ ui.field("date_to", "Дуусах огноо", value=f.date_to, type="date") }}
@@ -14,9 +15,9 @@
 </form>
 {% if rows %}
 <table class="table">
-  <thead><tr><th>Огноо, цаг</th><th>Данс</th><th class="num">Дүн</th><th>Утга</th></tr></thead>
+  <thead><tr><th scope="col">Огноо, цаг</th><th scope="col">Данс</th><th scope="col">Утга</th><th scope="col" class="num">Дүн</th></tr></thead>
   <tbody>
-  {% for r in rows %}<tr><td class="tabular">{{ r.txn_at | dt }}</td><td>{{ r.account }}</td><td class="num tabular">{{ r.amount | amount(r.currency) }}</td><td class="truncate" title="{{ r.description }}">{{ r.description }}</td></tr>{% endfor %}
+  {% for r in rows %}<tr><td class="tabular nowrap">{{ r.txn_at | dt }}</td><td class="nowrap">{{ r.account }}</td><td class="truncate" title="{{ r.description }}">{{ r.description }}</td><td class="num tabular nowrap">{{ r.amount | amount(r.currency) }}</td></tr>{% endfor %}
   </tbody>
 </table>
 <div class="title-row">{{ ui.pager(page, pages, "/history?date_from=" ~ (f.date_from | urlq) ~ "&date_to=" ~ (f.date_to | urlq) ~ "&account=" ~ (f.account | urlq) ~ "&amount_min=" ~ (f.amount_min | urlq) ~ "&amount_max=" ~ (f.amount_max | urlq) ~ "&") }}<span class="muted tabular">Нийт {{ total }} гүйлгээ</span></div>

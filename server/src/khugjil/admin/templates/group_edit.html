@@ -2,7 +2,7 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ group.name }}{% endblock %}
 {% block content %}
-<p><a href="/groups">‹ Бүлгүүд</a></p>
+<nav class="breadcrumb" aria-label="Байршил"><a href="/groups">Бүлгүүд</a> / <span>{{ group.name }}</span></nav>
 <h1>{{ group.name }}</h1>
 <form method="post" action="/groups/{{ group.id }}" class="stack">
   {{ ui.csrf() }}

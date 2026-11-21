@@ -32,7 +32,7 @@
 {% macro field(name, label, value="", type="text", hint=None, required=False, attrs={}) %}
 <label class="field">
   <span class="field-label">{{ label }}</span>
-  <input type="{{ type }}" name="{{ name }}" value="{{ value }}"{% if required %} required{% endif %}{% for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
   {% if hint %}<span class="field-hint">{{ hint }}</span>{% endif %}
+  <input type="{{ type }}" name="{{ name }}" value="{{ value }}"{% if required %} required{% endif %}{% for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
 </label>
 {% endmacro %}

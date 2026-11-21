@@ -1,40 +1,76 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
-{% block title %}Имэйл холболт{% endblock %}
+{% block title %}Банкны имэйл{% endblock %}
 {% block content %}
-<h1>Имэйл холболт</h1>
-{% if notice == "test" %}<p class="notice notice-success" role="status">Туршилтын мэдэгдэл илгээлээ. Ээлжтэй төхөөрөмж болон таны Telegram дээр «Туршилт» гэсэн мэдэгдэл харагдах ёстой.</p>{% endif %}
-<section>
-  <h2>Хүлээн авах хаяг</h2>
-  {% if address %}
-  <div class="copy-row"><code id="inbound" class="wrap">{{ address }}</code>
-    <button type="button" class="btn btn-secondary btn-sm" data-copy="inbound">Хуулах</button>
-    {{ ui.confirm_form("/email/rotate", "Шинэ хаяг", "Шинэ хаяг үүсгэх үү? Хуучин хаяг шууд хүчингүй болох тул Gmail-ийн дамжуулалтыг шинэ хаяг руу дахин тохируулах шаардлагатай.", "secondary") }}</div>
-  <p class="muted small">Энэ хаягийг нууцлана уу. Хэн нэгэнд задарсан гэж үзвэл шинэ хаяг үүсгэнэ үү.</p>
+<h1>Банкны имэйл</h1>
+<p class="lead">Банкны гүйлгээний мэдэгдлийг Gmail-ээс доорх хаяг руу дамжуулна. Gmail бүртгэл бүрт тусдаа хаяг нэмж, хэрэггүй болсныг нь хасаж болно.</p>
+{% if notice %}<p class="notice notice-success" role="status">{{ notice }}</p>{% endif %}
+{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+
+<div class="status-line" hx-get="/email/status" hx-trigger="every 15s" hx-swap="innerHTML">{% include "_email_status.html" %}</div>
+
+<section aria-labelledby="addresses-title">
+  <div class="section-head">
+    <h2 id="addresses-title">Хүлээн авах хаяг</h2>
+    <p class="section-meta tabular">{{ addresses | length }} / {{ max_addresses }}</p>
+  </div>
+  {% if addresses %}
+  <table class="table">
+    <thead><tr><th scope="col">Нэр</th><th scope="col">Хаяг</th><th scope="col">Нэмсэн</th><th scope="col" class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+    <tbody>
+    {% for id, address, label, created in addresses %}
+    <tr>
+      <td>
+        <form method="post" action="/email/addresses/{{ id }}/label" class="inline-edit">
+          {{ ui.csrf() }}
+          <input name="label" value="{{ label or '' }}" maxlength="60" aria-label="Хаягийн нэр" placeholder="Нэргүй">
+          <button class="btn btn-secondary btn-sm" type="submit">Хадгалах</button>
+        </form>
+      </td>
+      <td><code id="inbound-{{ loop.index }}" class="address">{{ address }}</code></td>
+      <td class="tabular nowrap">{{ (created | dt)[:10] }}</td>
+      <td class="num actions">
+        <button type="button" class="btn btn-secondary btn-sm" data-copy="inbound-{{ loop.index }}">Хуулах</button>
+        {{ ui.confirm_form("/email/addresses/" ~ id ~ "/replace", "Солих", "«" ~ (label or address) ~ "» хаягийг шинээр солих уу? Хуучин хаяг шууд хүчингүй болох тул тэр Gmail-ийн дамжуулалтыг шинэ хаяг руу дахин тохируулна.", "secondary") }}
+        {% if addresses | length > 1 %}{{ ui.confirm_form("/email/addresses/" ~ id ~ "/retire", "Хасах", "«" ~ (label or address) ~ "» хаягийг хасах уу? Энэ хаяг руу ирсэн имэйлийг цаашид хүлээн авахгүй.") }}{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
   {% else %}
-  {{ ui.empty("Хаяг алга", "Шинэ хаяг үүсгэнэ үү.") }}
+  {{ ui.empty("Хаяг алга", "Доорх маягтаар хүлээн авах хаяг нэмнэ үү.") }}
   {% endif %}
-  <div hx-get="/email/status" hx-trigger="every 15s" hx-swap="innerHTML">{% include "_email_status.html" %}</div>
+  {% if addresses | length < max_addresses %}
+  <form method="post" action="/email/addresses" class="row-form add-form">
+    {{ ui.csrf() }}
+    {{ ui.field("label", "Шинэ хаягийн нэр", hint="Аль Gmail-ээс дамжуулахыг тэмдэглэнэ. Жишээ нь «Төв салбарын Gmail»", attrs={"maxlength": "60"}) }}
+    <button class="btn btn-primary" type="submit">Хаяг нэмэх</button>
+  </form>
+  {% endif %}
+  <p class="muted small">Хаягийг нууцлана уу. Задарсан гэж үзвэл «Солих» товчоор шинэ хаяг авна уу. Хаяг нэмэх, солих, хасахад дахин баталгаажуулалт шаардана.</p>
 </section>
-<section>
-  <h2>Gmail тохируулах</h2>
+
+<section aria-labelledby="gmail-title">
+  <h2 id="gmail-title">Gmail тохируулах</h2>
   <ol class="steps">
-    <li><strong>Дамжуулах хаяг нэмэх.</strong> Gmail → Тохиргоо → «Дамжуулалт ба POP/IMAP» → «Дамжуулах хаяг нэмэх» хэсэгт дээрх хаягийг оруулна. <span class="placeholder">[зураг]</span></li>
-    <li><strong>Баталгаажуулах код.</strong>
+    <li><strong>Дамжуулах хаяг нэмэх.</strong> Gmail → Тохиргоо → «Дамжуулалт ба POP/IMAP» → «Дамжуулах хаяг нэмэх» хэсэгт дээрх хаягаас тухайн Gmail-д зориулсныг оруулна.</li>
+    <li><strong>Баталгаажуулах.</strong>
       {% if fwd_link %}Gmail баталгаажуулах холбоос илгээсэн: <a class="btn btn-primary btn-sm" href="{{ fwd_link }}" target="_blank" rel="noopener noreferrer">Gmail дамжуулалтыг баталгаажуулах</a> <span class="muted">({{ fwd_expires | dt }} хүртэл)</span>. Gmail-д нэвтэрсэн хөтчөөрөө дарна уу.
       {% elif fwd_code %}Gmail-ээс ирсэн код: <strong class="code tabular">{{ fwd_code }}</strong> <span class="muted">({{ fwd_expires | dt }} хүртэл хүчинтэй)</span>. Энэ кодыг Gmail-ийн тохиргоонд оруулна уу.
-      {% else %}Gmail баталгаажуулах имэйл илгээсний дараа код энд харагдана. Хуудас өөрөө шинэчлэгдэнэ.{% endif %}</li>
-    <li><strong>Шүүлтүүр үүсгэх.</strong> Gmail → Тохиргоо → «Шүүлтүүр» → «Шинэ шүүлтүүр»: From = {{ bank_senders | join(", ") }}. «Дамжуулах» сонголтоор дээрх хаягийг сонгоно. Зөвхөн банкны гүйлгээний мэдэгдэл дамжуулна уу. <span class="placeholder">[зураг]</span></li>
-    <li><strong>Шалгах.</strong> Доорх товчоор туршилтын мэдэгдэл илгээж, кассын дэлгэц дээр харагдаж байгааг шалгана.
+      {% else %}Gmail баталгаажуулах имэйл илгээсний дараа код эсвэл холбоос энд харагдана. Хуудас өөрөө шинэчлэгдэнэ.{% endif %}</li>
+    <li><strong>Шүүлтүүр үүсгэх.</strong> Gmail → Тохиргоо → «Шүүлтүүр» → «Шинэ шүүлтүүр»: From = {{ bank_senders | join(", ") }}. «Дамжуулах» сонголтоор дээрх хаягийг сонгоно. Зөвхөн банкны гүйлгээний мэдэгдлийг дамжуулна уу.</li>
+    <li><strong>Шалгах.</strong> Туршилтын мэдэгдэл илгээж, кассын дэлгэц дээр харагдаж байгааг шалгана.
       <form method="post" action="/email/test" class="inline">{{ ui.csrf() }}<button class="btn btn-secondary btn-sm" type="submit">Тест илгээх</button></form></li>
   </ol>
 </section>
-<section>
-  <h2>Сүүлд ирсэн имэйлүүд</h2>
-  <p class="muted small">Имэйлийн агуулгыг хадгалдаггүй. Зөвхөн ирсэн цаг болон үр дүнг харуулна.</p>
+
+<section aria-labelledby="events-title">
+  <h2 id="events-title">Сүүлд ирсэн имэйл</h2>
+  <p class="muted small">Имэйлийн агуулгыг хадгалдаггүй. Зөвхөн ирсэн цаг болон шалгалтын үр дүнг харуулна.</p>
   {% if events %}
-  <table class="table"><thead><tr><th>Цаг</th><th>Үр дүн</th></tr></thead><tbody>
-  {% for at, label in events %}<tr><td class="tabular">{{ at | dt }}</td><td>{{ label }}</td></tr>{% endfor %}
+  <table class="table"><thead><tr><th scope="col">Цаг</th><th scope="col">Үр дүн</th></tr></thead><tbody>
+  {% for at, label in events %}<tr><td class="tabular nowrap">{{ at | dt }}</td><td>{{ label }}</td></tr>{% endfor %}
   </tbody></table>
   {% else %}{{ ui.empty("Имэйл ирээгүй байна", "Gmail-ийн дамжуулалт ба шүүлтүүрээ дээрх алхмаар тохируулна уу.") }}{% endif %}
 </section>

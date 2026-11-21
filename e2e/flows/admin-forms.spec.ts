@@ -102,23 +102,40 @@ test("history: filter by account and export CSV", async () => {
   expect(csv).not.toContain("TESTPAYERMARKER"); // payer names never stored, so never exported
 });
 
-test("email: test notification, and rotating the address (with step-up when asked)", async () => {
+test("email: test notification, a second address, replacing and retiring (step-up when asked)", async () => {
   await page.goto(`${ADMIN}/email`);
   await page.click("button:has-text('Тест илгээх')");
   await expect(page).toHaveURL(new RegExp(`${ADMIN}/email`));
-  const before = (await page.locator("#inbound").textContent())!.trim();
+  const first = (await page.locator("#inbound-1").textContent())!.trim();
+  const addresses = page.locator("section[aria-labelledby='addresses-title'] tbody tr");
 
-  await confirmAndSubmit(page, page.locator("button:has-text('Шинэ хаяг')"));
-  if (page.url().includes("/stepup")) {
-    await expect(page.locator("h1")).toHaveText("Дахин баталгаажуулна уу");
-    await page.fill("input[name=code]", await shop.code(page));
-    await page.click("button:has-text('Баталгаажуулах')");
-    if (!page.url().endsWith("/email")) await page.goto(`${ADMIN}/email`);
-    if ((await page.locator("#inbound").textContent())!.trim() === before) {
-      await confirmAndSubmit(page, page.locator("button:has-text('Шинэ хаяг')"));
+  // Adding, replacing and retiring need a fresh TOTP; after it the owner is back on /email.
+  async function withStepUp(act: () => Promise<void>): Promise<void> {
+    await act();
+    if (page.url().includes("/stepup")) {
+      await expect(page.locator("h1")).toHaveText("Дахин баталгаажуулна уу");
+      await page.fill("input[name=code]", await shop.code(page));
+      await page.click("button:has-text('Баталгаажуулах')");
+      await expect(page).toHaveURL(new RegExp(`${ADMIN}/email`));
+      await act();
     }
   }
-  await expect(page.locator("#inbound")).not.toHaveText(before);
+
+  await withStepUp(async () => {
+    await page.fill("input[name=label]:not([aria-label])", "Салбар-2 Gmail");
+    await page.click("button:has-text('Хаяг нэмэх')");
+  });
+  await expect(addresses).toHaveCount(2);
+  await expect(page.locator("#inbound-1")).toHaveText(first);
+  await expect(page.locator("input[aria-label='Хаягийн нэр']").nth(1)).toHaveValue("Салбар-2 Gmail");
+
+  await withStepUp(() => confirmAndSubmit(page, addresses.first().locator("button:has-text('Солих')")));
+  await expect(page.locator(".notice-success")).toContainText("Хаягийг солилоо.");
+  await expect(page.locator("section[aria-labelledby='addresses-title'] tbody")).not.toContainText(first);
+
+  await withStepUp(() => confirmAndSubmit(page, addresses.first().locator("button:has-text('Хасах')")));
+  await expect(addresses).toHaveCount(1);
+  await expect(addresses.locator("button:has-text('Хасах')")).toHaveCount(0); // the last one stays
 });
 
 test("audit log records the actions above", async () => {

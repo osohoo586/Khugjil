@@ -2,7 +2,7 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ device.name }}{% endblock %}
 {% block content %}
-<p><a href="/devices">‹ Төхөөрөмжүүд</a></p>
+<nav class="breadcrumb" aria-label="Байршил"><a href="/devices">Төхөөрөмж</a> / <span>{{ device.name }}</span></nav>
 <h1>{{ device.name }}</h1>
 <form method="post" action="/devices/{{ device.id }}" class="stack narrow">
   {{ ui.csrf() }}

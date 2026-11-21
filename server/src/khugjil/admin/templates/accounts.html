@@ -3,10 +3,11 @@
 {% block title %}Дансууд{% endblock %}
 {% block content %}
 <h1>Дансууд</h1>
+<p class="lead">Орлого хүлээн авах банкны дансууд. Дугаарыг шифрлэж хадгалах ба зөвхөн сүүлийн 4 оронг харуулна.</p>
 {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
 {% if accounts %}
 <table class="table">
-  <thead><tr><th>Товч нэр</th><th>Данс</th><th>Төлөв</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <thead><tr><th scope="col">Товч нэр</th><th scope="col">Данс</th><th scope="col">Төлөв</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
   <tbody>
   {% for a in accounts %}
   <tr>
@@ -40,7 +41,6 @@
   {{ ui.csrf() }}
   {{ ui.field("number", "Дансны дугаар", type="text", required=True, attrs={"inputmode": "numeric", "maxlength": "40", "autocomplete": "off"}) }}
   {{ ui.field("alias", "Товч нэр", hint="Жишээ нь Төв дэлгүүр", required=True, attrs={"maxlength": "60"}) }}
-  <button class="btn btn-primary" type="submit">Нэмэх</button>
+  <button class="btn btn-primary" type="submit">Данс нэмэх</button>
 </form>
-<p class="muted small">Дансны дугаарыг шифрлэж хадгалах ба зөвхөн сүүлийн 4 оронг харуулна.</p>
 {% endblock %}

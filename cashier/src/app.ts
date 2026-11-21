@@ -1,7 +1,7 @@
 import { type Api, ApiError, type DeviceInfo, type Txn } from "./api";
 import { Chime } from "./audio";
 import { h, replace } from "./dom";
-import { clock } from "./format";
+import { clock, dayLabel } from "./format";
 import type { LiveConnection, Platform } from "./platform";
 import { Feed } from "./ui/feed";
 import {
@@ -24,7 +24,7 @@ export function byBankTime(items: Txn[]): Txn[] {
 }
 
 const NO_VIEWER =
-  "Энэ төхөөрөмжөөр гүйлгээ харах эрхтэй хүн алга. Админ «Бүлгүүд» хуудаснаас төхөөрөмжийн бүлэгт эзэмшигчийг нэмнэ үү.";
+  "Энэ төхөөрөмжөөр гүйлгээ харах эрхтэй хүн алга. Админ «Тохиргоо → Бүлгүүд» хуудаснаас төхөөрөмжийн бүлэгт эзэмшигчийг нэмнэ үү.";
 
 export class CashierApp {
   private info: DeviceInfo | null = null;
@@ -41,7 +41,14 @@ export class CashierApp {
   private readonly chime = new Chime();
   private readonly api: Api;
   private voice: Voice | null = null;
-  private refs: { status?: HTMLElement; clock?: HTMLElement; banner?: HTMLElement; sound?: HTMLElement; footer?: HTMLElement } = {};
+  private refs: {
+    status?: HTMLElement;
+    clock?: HTMLElement;
+    day?: HTMLElement;
+    banner?: HTMLElement;
+    sound?: HTMLElement;
+    footer?: HTMLElement;
+  } = {};
 
   constructor(
     private readonly root: HTMLElement,
@@ -129,6 +136,7 @@ export class CashierApp {
     const top = topBar(info, now, info.pin_shifts ? () => void this.endShift() : null);
     this.refs.status = top.status;
     this.refs.clock = top.clockEl;
+    this.refs.day = top.dayEl;
     this.refs.banner = h("div", { class: "banner banner-error", role: "alert", hidden: true }, "Холболт тасарсан — орлогын мэдэгдэл ирэхгүй байж болзошгүй");
     this.refs.sound = h(
       "button",
@@ -139,7 +147,7 @@ export class CashierApp {
     this.refs.footer = h("footer", { class: "totals", hidden: !info.show_today_totals });
     // No account is shared by this device, this cashier and an active group: nothing can arrive.
     const noAccounts = info.accounts.length === 0
-      ? message("Энэ ээлжинд харах данс алга тул гүйлгээ ирэхгүй. Админ «Бүлгүүд» хуудаснаас таны бүлэгт данс холбоно уу.", "error")
+      ? message("Энэ ээлжинд харах данс алга тул гүйлгээ ирэхгүй. Админ «Тохиргоо → Бүлгүүд» хуудаснаас таны бүлэгт данс холбоно уу.", "error")
       : null;
     replace(
       this.root,
@@ -165,13 +173,19 @@ export class CashierApp {
     }
     this.feed.update(this.items, fresh, now);
     if (this.refs.clock) replace(this.refs.clock, clock(now));
+    if (this.refs.day) replace(this.refs.day, dayLabel(now));
   }
 
   private async refreshTotals(): Promise<void> {
     if (!this.info?.show_today_totals || !this.refs.footer) return;
     try {
       const t = await this.api.summaryToday();
-      replace(this.refs.footer, `Өнөөдөр: ${t.count} гүйлгээ · ${t.total_text}`);
+      replace(
+        this.refs.footer,
+        h("span", { class: "totals-label" }, "Өнөөдөр"),
+        h("span", { class: "tabular" }, `${t.count} гүйлгээ`),
+        h("strong", { class: "totals-sum tabular" }, t.total_text),
+      );
     } catch {
       this.refs.footer.hidden = true;
     }

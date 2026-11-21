@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
-{% block title %}Төхөөрөмжүүд{% endblock %}
+{% block title %}Төхөөрөмж{% endblock %}
 {% block content %}
-<h1>Төхөөрөмжүүд</h1>
+<h1>Төхөөрөмж</h1>
+<p class="lead">Орлогын мэдэгдэл харуулдаг кассын компьютер, утас. Онлайн гэдэг нь сүүлийн 45 секундэд холбогдсон гэсэн үг.</p>
 {% if devices %}
 <table class="table">
-  <thead><tr><th>Нэр</th><th>Төрөл</th><th>Бүлэг</th><th>Сүүлд</th><th>Төлөв</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
+  <thead><tr><th scope="col">Нэр</th><th scope="col">Төрөл</th><th scope="col">Бүлэг</th><th scope="col">Сүүлд</th><th scope="col">Төлөв</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
   <tbody>
   {% for d in devices %}
   <tr>

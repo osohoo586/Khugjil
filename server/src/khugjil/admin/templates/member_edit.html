@@ -2,8 +2,9 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ member.display_name }}{% endblock %}
 {% block content %}
-<p><a href="/members">‹ Хэрэглэгчид</a></p>
+<nav class="breadcrumb" aria-label="Байршил"><a href="/members">Хэрэглэгчид</a> / <span>{{ member.display_name }}</span></nav>
 <h1>{{ member.display_name }}</h1>
+<p class="lead">{{ member.role | role }}{% if member.status == "invited" %} · урилга хүлээгдэж буй{% endif %}{% if consent_version %} · зөвшөөрөл v{{ consent_version }}{% endif %}</p>
 <form method="post" action="/members/{{ member.id }}" class="stack narrow">
   {{ ui.csrf() }}
   {{ ui.field("display_name", "Нэр", value=member.display_name, required=True, attrs={"maxlength": "60"}) }}
@@ -26,4 +27,19 @@
   {{ ui.field("end", "Дуусах", value="21:00", type="time", required=True) }}
   <button class="btn btn-secondary" type="submit">Нэмэх</button>
 </form>
+{% if member.id != ctx.member.id %}
+<section class="danger-zone" aria-labelledby="access-title">
+  <h2 id="access-title">Эрх ба зөвшөөрөл</h2>
+  <dl class="action-list">
+    <div><dt>Шинэ урилга</dt><dd>Одоогийн ПИН код, нууц үг хүчингүй болж, идэвхтэй ээлж дуусна.</dd>
+      <dd>{{ ui.confirm_form("/members/" ~ member.id ~ "/reinvite", "Шинэ урилга үүсгэх", member.display_name ~ "-д шинэ урилга үүсгэх үү? Одоогийн ПИН код, нууц үг хүчингүй болж, ээлж нь дуусна.", "secondary") }}</dd></div>
+    {% if consent_version %}
+    <div><dt>Зөвшөөрөл цуцлах</dt><dd>Мэдэгдэл шууд зогсоно. Дахин авахын тулд хэрэглэгч зөвшөөрлөө дахин өгнө.</dd>
+      <dd>{{ ui.confirm_form("/members/" ~ member.id ~ "/consent/revoke", "Зөвшөөрөл цуцлах", member.display_name ~ "-ийн зөвшөөрлийг цуцлах уу? Мэдэгдэл шууд зогсоно.", "secondary") }}</dd></div>
+    {% endif %}
+    <div><dt>Эрх цуцлах</dt><dd>Хэрэглэгч нэвтрэх боломжгүй болж, идэвхтэй ээлж нь шууд дуусна.</dd>
+      <dd>{{ ui.confirm_form("/members/" ~ member.id ~ "/revoke", "Эрх цуцлах", member.display_name ~ "-ийн эрхийг цуцлах уу? Идэвхтэй ээлж нь шууд дуусч, мэдэгдэл цаашид ирэхгүй.") }}</dd></div>
+  </dl>
+</section>
+{% endif %}
 {% endblock %}

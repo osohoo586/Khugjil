@@ -1,6 +1,6 @@
 import type { DeviceInfo } from "../api";
 import { h } from "../dom";
-import { clock } from "../format";
+import { clock, dayLabel } from "../format";
 
 /** Items kept in memory (and fetched after a reconnect); the feed shows FEED_LIMIT of them. */
 export const LIST_LIMIT = 10;
@@ -14,17 +14,18 @@ export function topBar(
   info: DeviceInfo,
   now: Date,
   onEnd: (() => void) | null,
-): { el: HTMLElement; status: HTMLElement; clockEl: HTMLElement } {
+): { el: HTMLElement; status: HTMLElement; clockEl: HTMLElement; dayEl: HTMLElement } {
   const name = info.accounts.length ? info.accounts.join(" · ") : info.tenant_name;
   const status = h("span", { class: "status ok" }, "Холбогдсон");
   const clockEl = h("span", { class: "top-clock" }, clock(now));
+  const dayEl = h("span", { class: "top-day" }, dayLabel(now));
   const right = h("div", { class: "top-right" });
   // With PIN shifts the member on duty matters; without, the device name adds nothing.
   if (info.shift && info.pin_shifts) right.append(h("span", { class: "who" }, info.shift.display_name));
-  right.append(clockEl);
+  right.append(h("p", { class: "top-time" }, dayEl, clockEl));
   if (onEnd) right.append(h("button", { type: "button", class: "btn btn-secondary", onclick: onEnd }, "Ээлж дуусгах"));
   const el = h("header", { class: "top" }, h("span", { class: "shop" }, name), status, right);
-  return { el, status, clockEl };
+  return { el, status, clockEl, dayEl };
 }
 
 export function shiftStart(
@@ -69,11 +70,11 @@ export function shiftStart(
 const PAIR_COPY = {
   web: {
     title: "Төхөөрөмж холбох",
-    hint: "Админ хэсгийн «Төхөөрөмжүүд» хуудаснаас авсан 12 тэмдэгттэй кодыг оруулна уу. Код 10 минутын дотор нэг удаа ажиллана.",
+    hint: "Админ хэсгийн «Төхөөрөмж» хуудаснаас авсан 12 тэмдэгттэй кодыг оруулна уу. Код 10 минутын дотор нэг удаа ажиллана.",
   },
   agent: {
     title: "Энэ компьютерийг холбох",
-    hint: "Админ хэсгийн «Төхөөрөмжүүд» хуудаснаас «Агент» төрлийн код үүсгээд энд оруулна уу. Код 10 минутын дотор нэг удаа ажиллана.",
+    hint: "Админ хэсгийн «Төхөөрөмж» хуудаснаас «Агент» төрлийн код үүсгээд энд оруулна уу. Код 10 минутын дотор нэг удаа ажиллана.",
   },
 } as const;
 

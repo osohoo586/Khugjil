@@ -42,7 +42,7 @@ test("owner signs in, pairs a cashier PC, sees a live payment, revokes the PC", 
   shop.seed("txn", "21500", `Flow ${shop.run}`);
   await expect(cashier.locator(".toast").first()).toContainText("21,500 ₮", { timeout: 20_000 });
   await expect(cashier.locator(".row.latest .row-amount")).toHaveText("21,500 ₮");
-  await expect(cashier.locator("tbody tr").first()).toContainText(`Flow ${shop.run}`);
+  await expect(cashier.locator(".row.latest .row-desc")).toContainText(`Flow ${shop.run}`); // the feed is a list since 054fb2d
 
   await admin.goto(`${ADMIN}/devices`);
   const row = admin.locator("tr", { hasText: "Flow-касс" });

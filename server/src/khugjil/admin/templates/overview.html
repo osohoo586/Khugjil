@@ -3,35 +3,35 @@
 {% block title %}Тойм{% endblock %}
 {% block content %}
 <h1>Тойм</h1>
-<div class="cards">
-  <section class="card">
-    <h2 class="card-title">Банкны имэйл</h2>
-    <p class="card-value">{% if last_ok %}Сүүлд ирсэн {{ last_ok | hm }}{% else %}Одоогоор ирээгүй{% endif %}</p>
-    <p>{% if forwarding_ok %}{{ ui.badge("success", "Хэвийн") }}{% else %}{{ ui.badge("warning", "Шалгах шаардлагатай") }}{% endif %}</p>
-  </section>
-  <section class="card">
-    <h2 class="card-title">Онлайн төхөөрөмж</h2>
-    <p class="card-value tabular">{{ devices_online }} / {{ devices_total }}</p>
-    {% if offline_names %}<p class="muted">Офлайн: {{ offline_names | join(", ") }}</p>{% endif %}
-  </section>
-  <section class="card">
-    <h2 class="card-title">Амжилтгүй илгээлт</h2>
-    <p class="card-value tabular">{{ failed }}</p>
-    <p class="muted">Сүүлийн 24 цаг</p>
-  </section>
-</div>
-<div hx-get="/overview/live" hx-trigger="every 10s" hx-swap="innerHTML">{% include "_overview_live.html" %}</div>
-<section>
-  <h2>Анхаарах асуудал</h2>
-  {% if problems %}
-  <table class="table">
-    <thead><tr><th>Асуудал</th><th class="num"><span class="sr-only">Үйлдэл</span></th></tr></thead>
-    <tbody>
-    {% for text, href in problems %}<tr><td>{{ text }}</td><td class="num"><a href="{{ href }}">Юу хийх вэ</a></td></tr>{% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  {{ ui.empty("Анхаарах асуудал алга", "Бүх зүйл хэвийн ажиллаж байна.") }}
-  {% endif %}
+<p class="lead">Сүүлийн орлого болон системийн төлөв. Хуудас өөрөө шинэчлэгдэнэ.</p>
+
+{% if problems %}
+<section class="notice notice-warning" aria-labelledby="problems-title">
+  <h2 id="problems-title" class="notice-title">Анхаарах асуудал: {{ problems | length }}</h2>
+  <ul class="problems">
+  {% for text, href in problems %}
+    <li><span>{{ text }}</span>{% if ctx.role == "owner" or (ctx.role == "admin" and href != "/email") %} <a href="{{ href }}">Шийдвэрлэх</a>{% endif %}</li>
+  {% endfor %}
+  </ul>
 </section>
+{% endif %}
+
+<dl class="status-row">
+  <div>
+    <dt>Банкны имэйл</dt>
+    <dd>{% if forwarding_ok %}{{ ui.badge("success", "Хэвийн") }}{% else %}{{ ui.badge("warning", "Шалгах шаардлагатай") }}{% endif %}
+      <span class="muted">{% if last_ok %}сүүлд {{ last_ok | hm }}{% else %}одоогоор ирээгүй{% endif %}</span></dd>
+  </div>
+  <div>
+    <dt>Кассын төхөөрөмж</dt>
+    <dd><span class="tabular">{{ devices_online }} / {{ devices_total }}</span> онлайн
+      {% if offline_names %}<span class="muted">· офлайн: {{ offline_names | join(", ") }}</span>{% endif %}</dd>
+  </div>
+  <div>
+    <dt>Илгээгдээгүй мэдэгдэл, 24 цаг</dt>
+    <dd class="tabular">{% if failed %}{{ ui.badge("error", failed ~ "") }}{% else %}0{% endif %}</dd>
+  </div>
+</dl>
+
+<div hx-get="/overview/live" hx-trigger="every 10s" hx-swap="innerHTML">{% include "_overview_live.html" %}</div>
 {% endblock %}

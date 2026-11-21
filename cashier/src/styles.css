@@ -34,7 +34,9 @@ input, select { font: inherit; font-size: var(--fs-md); min-height: var(--hit); 
 .status.bad { color: var(--error); }
 .status.wait { color: var(--text-muted); }
 .top-right { justify-self: end; display: flex; gap: var(--sp-2); align-items: center; }
-.top-clock { font-size: var(--fs-lg); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; }
+.top-time { display: flex; align-items: baseline; gap: var(--sp-1); }
+.top-day { color: var(--text-muted); white-space: nowrap; }
+.top-clock { font-size: var(--fs-lg); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
 .who { font-weight: var(--fw-medium); }
 
 /* Banners */
@@ -62,7 +64,10 @@ input, select { font: inherit; font-size: var(--fs-md); min-height: var(--hit); 
 .row.latest .row-desc { font-size: var(--fs-xl); font-weight: var(--fw-medium); }
 .row.latest .row-amount { font-size: var(--fs-2xl); }
 .row.new { background: var(--accent-tint); border-left-color: var(--accent); }
-.totals { max-width: 1120px; margin: 0 auto; padding: 0 var(--sp-3) var(--sp-3); font-size: var(--fs-md); color: var(--text-muted); }
+/* Today's count and sum: one quiet ledger line under the feed (tenant setting). */
+.totals { --edge: calc(var(--sp-3) + 1px + var(--sp-3)); max-width: 1120px; margin: 0 auto; padding: 0 var(--edge) var(--sp-3) calc(var(--edge) + 4px); display: flex; align-items: baseline; gap: var(--sp-2); font-size: var(--fs-md); color: var(--text-muted); }
+.totals[hidden] { display: none; }
+.totals-sum { margin-left: auto; color: var(--text); font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
 
 /* Toasts: 360x112, bottom-right, 16px margin, 4px accent bar, progress line. */
 .toasts { position: fixed; right: var(--sp-2); bottom: var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-1); align-items: flex-end; z-index: 50; }
@@ -86,12 +91,14 @@ input, select { font: inherit; font-size: var(--fs-md); min-height: var(--hit); 
 /* Medium (481-1023 px): same rows, tighter. */
 body[data-layout="medium"] .feed { padding: var(--sp-2); }
 body[data-layout="medium"] .row { grid-template-columns: 88px minmax(0, 1fr) auto; gap: var(--sp-2); padding: var(--sp-2); }
+body[data-layout="medium"] .totals { --edge: calc(var(--sp-2) + 1px + var(--sp-2)); }
 
 /* Compact (<= 480 px, docked beside the POS program) and phone: time + amount on one line,
    the description below at full width. */
 body[data-layout="compact"] .top { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); padding: var(--sp-1) var(--sp-2); min-height: 56px; }
 body[data-layout="compact"] .shop { flex: 1 1 0; min-width: 0; }
 body[data-layout="compact"] .top-clock { font-size: var(--fs-md); }
+body[data-layout="compact"] .top-day { display: none; }
 body[data-layout="compact"] .feed { padding: var(--sp-1); }
 body[data-layout="compact"] .row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when amount" "what what"; gap: var(--sp-0) var(--sp-2); padding: var(--sp-2); }
 body[data-layout="compact"] .row-when { flex-direction: row; align-items: baseline; gap: var(--sp-1); }
@@ -102,7 +109,7 @@ body[data-layout="compact"] .row.latest { padding-top: var(--sp-2); padding-bott
 body[data-layout="compact"] .row.latest .row-time { font-size: var(--fs-lg); }
 body[data-layout="compact"] .row.latest .row-desc { font-size: 22px; }
 body[data-layout="compact"] .row.latest .row-amount { font-size: 36px; }
-body[data-layout="compact"] .totals { padding: 0 var(--sp-1) var(--sp-2); }
+body[data-layout="compact"] .totals { --edge: calc(var(--sp-1) + 1px + var(--sp-2)); padding-bottom: var(--sp-2); }
 body[data-layout="compact"] .toasts { left: var(--sp-1); right: var(--sp-1); align-items: stretch; }
 body[data-layout="compact"] .toast { width: auto; }
 

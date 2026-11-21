@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from khugjil.db.tenancy import tenant_session
 from khugjil.events import RecordingEventBus
+from khugjil.ingest.reasons import Reason
 from khugjil.services.invites import create_owner_invite
 from tests.conftest import make_settings
 from tests.fixtures.api import ADMIN, ApiHarness, admin_login, make_admin
@@ -365,21 +366,123 @@ async def test_device_pairing_and_revoke(
     assert (await h.client.get(f"/devices/{world.device_id}")).status_code == 404
 
 
-async def test_email_rotate_requires_stepup(
-    owner: tuple[ApiHarness, str, uuid.UUID], world: Any
+async def _active_addresses(world: Any) -> list[dict[str, Any]]:
+    rows = await world.rows("inbound_address")
+    return sorted(
+        (r for r in rows if r["tenant_id"] == world.tenant_id and r["status"] == "active"),
+        key=lambda r: r["created_at"],
+    )
+
+
+def _address(world: Any, local_enc: bytes) -> str:
+    from khugjil.crypto import field_aad
+
+    local = world.db.crypto.decrypt_str(
+        local_enc, field_aad(world.tenant_id, "inbound_address", "local_part_enc")
+    )
+    return f"{local}@{world.db.settings.inbound_domain}"
+
+
+async def test_email_addresses_need_stepup_and_each_one_works(
+    owner: tuple[ApiHarness, str, uuid.UUID], world: Any, mailer: Mailer
 ) -> None:
+    """Owner's request (2026-11-21): more than one inbound address, added, replaced and retired
+    one at a time, each behind a fresh TOTP, and each one a working way in for bank mail."""
     h, csrf, _ = owner
     page = (await h.client.get("/email")).text
     assert world.inbound_address in page
     async with tenant_session(world.db.sm, world.tenant_id) as s:
         await s.execute(text("UPDATE session SET stepup_at = now() - interval '1 hour'"))
-    r = await h.client.post("/email/rotate", data={"csrf": csrf})
-    assert r.headers["location"].startswith("/stepup?next=/email/rotate")
+    r = await h.client.post("/email/addresses", data={"csrf": csrf, "label": "Салбар-2 Gmail"})
+    assert r.headers["location"] == "/stepup?next=/email"
+    assert len(await _active_addresses(world)) == 1
     await stepup(h, csrf, h.extra["secret"], "/email")  # type: ignore[attr-defined]
-    r = await h.client.post("/email/rotate", data={"csrf": csrf})
-    assert r.status_code == 303
-    assert world.inbound_address not in (await h.client.get("/email")).text
+
+    r = await h.client.post("/email/addresses", data={"csrf": csrf, "label": "Салбар-2 Gmail"})
+    assert (r.status_code, r.headers["location"]) == (303, "/email?notice=added")
+    first, second = await _active_addresses(world)
+    assert second["label"] == "Салбар-2 Gmail"
+    new_address = _address(world, second["local_part_enc"])
+    page = (await h.client.get(r.headers["location"])).text
+    assert world.inbound_address in page
+    assert new_address in page
+    assert "Шинэ хаяг нэмлээ." in page
+    # Both addresses deliver; the old one keeps working.
+    ok = Reason.ACCEPTED
+    assert (await world.ingest(mailer.bank_mail(FakeTxn(journal="101")))).reason == ok
+    out = await world.ingest(mailer.bank_mail(FakeTxn(journal="102")), rcpt=new_address)
+    assert out.reason == ok
+
+    # Rename keeps the address.
+    r = await h.client.post(
+        f"/email/addresses/{first['id']}/label",
+        data={"csrf": csrf, "label": "  Төв \u202e  Gmail\u200b\x07 "},
+    )
+    assert r.headers["location"] == "/email?notice=renamed"
+    assert (await _active_addresses(world))[0]["label"] == "Төв Gmail"
+
+    # Replacing one retires it at once, keeps its name and leaves the other alone.
+    r = await h.client.post(f"/email/addresses/{first['id']}/replace", data={"csrf": csrf})
+    assert r.headers["location"] == "/email?notice=replaced"
+    active = await _active_addresses(world)
+    assert [a["label"] for a in active] == ["Салбар-2 Gmail", "Төв Gmail"]
+    assert first["id"] not in {a["id"] for a in active}
+    gone = await world.ingest(mailer.bank_mail(FakeTxn(journal="103")))
+    assert gone.reason == Reason.RCPT_UNKNOWN
+    out = await world.ingest(mailer.bank_mail(FakeTxn(journal="104")), rcpt=new_address)
+    assert out.reason == ok
+
+    # Retire one; the last one cannot be retired (mail would stop silently).
+    r = await h.client.post(f"/email/addresses/{second['id']}/retire", data={"csrf": csrf})
+    assert r.headers["location"] == "/email?notice=retired"
+    (last,) = await _active_addresses(world)
+    r = await h.client.post(f"/email/addresses/{last['id']}/retire", data={"csrf": csrf})
+    assert r.headers["location"] == "/email?error=last"
+    assert len(await _active_addresses(world)) == 1
+    assert "Сүүлийн хаягийг хасах боломжгүй." in (await h.client.get("/email?error=last")).text
+
+    # At most five active addresses.
+    for i in range(4):
+        r = await h.client.post("/email/addresses", data={"csrf": csrf, "label": f"G{i}"})
+        assert r.headers["location"] == "/email?notice=added"
+    r = await h.client.post("/email/addresses", data={"csrf": csrf, "label": "G5"})
+    assert r.headers["location"] == "/email?error=limit"
+    assert len(await _active_addresses(world)) == 5
+    assert 'action="/email/addresses"' not in (await h.client.get("/email")).text
+
+    # Unknown ids are 404, and every change is in the audit log.
+    for action in ("replace", "retire", "label"):
+        r = await h.client.post(f"/email/addresses/{uuid.uuid4()}/{action}", data={"csrf": csrf})
+        assert r.status_code == 404, action
+    audit = [r for r in await world.rows("audit_log") if r["tenant_id"] == world.tenant_id]
+    actions = {r["action"] for r in audit}
+    assert {"inbound.add", "inbound.label", "inbound.rotate", "inbound.retire"} <= actions
+    # Ids and names only: the secret address never reaches the audit log.
+    assert all(r["object_id"] is not None for r in audit if r["action"].startswith("inbound."))
+    (label_row,) = [r for r in audit if r["action"] == "inbound.label"]
+    assert label_row["meta"] == {"old": None, "new": "Төв Gmail"}
+    (rotate_row,) = [r for r in audit if r["action"] == "inbound.rotate"]
+    assert rotate_row["meta"] == {"replaced": str(first["id"])}
+    text_dump = repr(audit)
+    assert world.inbound_address.split("@")[0] not in text_dump
+    assert new_address.split("@")[0] not in text_dump
     assert (await h.client.post("/email/test", data={"csrf": csrf})).status_code == 303
+    assert "Туршилтын мэдэгдэл илгээлээ." in (await h.client.get("/email?notice=test")).text
+
+
+async def test_admin_cannot_change_inbound_addresses(admin: ApiHarness, world: Any) -> None:
+    _, login, secret = await make_admin(world, "admin")
+    csrf = await admin_login(admin, login, secret)
+    (address,) = await _active_addresses(world)
+    for path in (
+        "/email/addresses",
+        f"/email/addresses/{address['id']}/replace",
+        f"/email/addresses/{address['id']}/retire",
+        f"/email/addresses/{address['id']}/label",
+    ):
+        r = await admin.client.post(path, data={"csrf": csrf, "label": "x"})
+        assert r.status_code == 403, path
+    assert (await _active_addresses(world))[0]["id"] == address["id"]
 
 
 async def test_history_csv_is_formula_safe(

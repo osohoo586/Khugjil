@@ -1,5 +1,5 @@
 import vectors from "../../shared/format_vectors.json";
-import { formatAmount, parseAmountInput, relativeTime } from "./format";
+import { dayLabel, formatAmount, parseAmountInput, relativeTime } from "./format";
 
 describe("formatAmount (shared vectors with the server)", () => {
   for (const v of vectors.amounts) {
@@ -34,5 +34,13 @@ describe("parseAmountInput", () => {
     ["1.234", null],
   ])("%s", (raw, expected) => {
     expect(parseAmountInput(raw)).toBe(expected);
+  });
+});
+
+describe("dayLabel", () => {
+  it("shows the Ulaanbaatar date and weekday", () => {
+    // 2026-11-20 16:30 UTC is already Saturday 00:30 in Ulaanbaatar (UTC+8).
+    expect(dayLabel(new Date("2026-11-20T16:30:00Z"))).toBe("2026.11.21, Бямба");
+    expect(dayLabel(new Date("2026-11-20T15:59:00Z"))).toBe("2026.11.20, Баасан");
   });
 });

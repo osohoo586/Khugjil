@@ -3,10 +3,11 @@
 {% block title %}Аудит лог{% endblock %}
 {% block content %}
 <h1>Аудит лог</h1>
+<p class="lead">Админы хэсэгт хийсэн үйлдэл бүр. Бичлэгийг засах, устгах боломжгүй.</p>
 {% if rows %}
 <table class="table">
-  <thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Объект</th></tr></thead>
-  <tbody>{% for r in rows %}<tr><td class="tabular">{{ r.at | dt }}</td><td>{{ names.get(r.actor_id, "Систем") }}</td><td><code>{{ r.action }}</code></td><td>{{ r.object_label or "—" }}</td></tr>{% endfor %}</tbody>
+  <thead><tr><th scope="col">Цаг</th><th scope="col">Хэн</th><th scope="col">Үйлдэл</th><th scope="col">Объект</th></tr></thead>
+  <tbody>{% for r in rows %}<tr><td class="tabular">{{ r.at | dt }}</td><td>{{ names.get(r.actor_id, "Систем") }}</td><td>{{ labels.get(r.action, r.action) }}</td><td>{{ r.object_label or "—" }}</td></tr>{% endfor %}</tbody>
 </table>
 {{ ui.pager(page, pages, "/audit?") }}
 {% else %}{{ ui.empty("Бичлэг алга", "Админы үйлдэл бүр энд бүртгэгдэнэ.") }}{% endif %}

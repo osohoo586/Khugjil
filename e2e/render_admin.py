@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from khugjil.admin.core import NAV, env
+from khugjil.admin.core import env, nav_items, settings_tabs, ub_now_parts
 
 NOW = datetime(2026, 10, 15, 6, 32, tzinfo=UTC)
 
@@ -23,14 +23,15 @@ def uid(n: int) -> uuid.UUID:
     return uuid.UUID(int=n)
 
 
-def ctx(role: str = "owner") -> SimpleNamespace:
+def ctx(path: str, role: str = "owner") -> SimpleNamespace:
     member = SimpleNamespace(id=uid(1), display_name="Д. Болд", role=role)
     return SimpleNamespace(
         tenant=SimpleNamespace(name="Жишээ ХХК", accent="green"),
         member=member,
         role=role,
         csrf="0" * 64,
-        nav=lambda: [(h, label) for h, label, roles in NAV if role in roles],
+        nav=lambda: nav_items(role, path),
+        tabs=lambda: settings_tabs(role, path),
         rt=SimpleNamespace(settings=SimpleNamespace(telegram_bot_username="khugjil_bot")),
     )
 
@@ -88,7 +89,11 @@ def pages() -> dict[str, tuple[str, dict[str, Any]]]:
             "device_name": "Касс-3", "app_host": "app.example.mn", "kind": "web",
         }),
         "email": ("email.html", {
-            "notice": None, "address": "k7q2m4x9d3ta6vwe5hb2nrfy@in.example.mn",
+            "notice": None, "error": None, "max_addresses": 5,
+            "addresses": [
+                (uid(30), "k7q2m4x9d3ta6vwe5hb2nrfy@in.example.mn", "Төв салбарын Gmail", datetime(2026, 9, 2, 3, 0, tzinfo=UTC)),
+                (uid(31), "p3hw8zq5c2ld7tke4mya6vxn@in.example.mn", None, datetime(2026, 10, 14, 9, 12, tzinfo=UTC)),
+            ],
             "fwd_code": "123456789", "fwd_link": None, "fwd_expires": datetime(2026, 10, 16, 0, 40, tzinfo=UTC),
             "events": [(datetime(2026, 10, 15, 0, 37, tzinfo=UTC), "Хүлээн авсан"),
                        (datetime(2026, 10, 15, 0, 12, tzinfo=UTC), "Татгалзсан — DKIM баталгаажаагүй"),
@@ -106,9 +111,12 @@ def pages() -> dict[str, tuple[str, dict[str, Any]]]:
 def main(out_dir: str) -> None:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    c = ctx()
+    env.globals["ub_now_parts"] = lambda: ub_now_parts(NOW)  # the screenshots freeze time at NOW
+    paths = {"overview": "/", "history": "/history", "email": "/email", "members": "/members",
+             "devices": "/devices", "pair": "/devices"}  # fmt: skip
     for name, (template, values) in pages().items():
-        html = env.get_template(template).render(ctx=c, path="/" + name, **values)
+        path = paths[name]
+        html = env.get_template(template).render(ctx=ctx(path), path=path, **values)
         (out / f"{name}.html").write_text(html, encoding="utf-8")
     login = env.get_template("login.html").render(ctx=None, error=None)
     (out / "login.html").write_text(login, encoding="utf-8")

@@ -137,6 +137,11 @@ async def member_edit(ctx: Manager, member_id: uuid.UUID) -> HTMLResponse:
                 )
             ).scalars()
         )
+        consent = await s.scalar(
+            select(Consent.version).where(
+                Consent.member_id == member_id, Consent.revoked_at.is_(None)
+            )
+        )
     return ctx.render(
         "member_edit.html",
         member=member,
@@ -144,6 +149,7 @@ async def member_edit(ctx: Manager, member_id: uuid.UUID) -> HTMLResponse:
         selected=selected,
         windows=windows,
         roles=manageable_roles(ctx.role),
+        consent_version=consent,
     )
 
 

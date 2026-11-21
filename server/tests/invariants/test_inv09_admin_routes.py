@@ -43,11 +43,18 @@ async def test_other_tenant_object_ids_are_404(
         f"/devices/{b.device_id}": {"name": "x"},
         f"/devices/{b.device_id}/revoke": {},
     }
+    # Inbound addresses (several per tenant since 2026-11-21): ids of another tenant are 404,
+    # even with a fresh step-up, and the address keeps working for its own tenant.
+    (b_address,) = [r for r in await b.rows("inbound_address") if r["tenant_id"] == b.tenant_id]
+    for action in ("replace", "retire", "label"):
+        posts[f"/email/addresses/{b_address['id']}/{action}"] = {"label": "x"}
     for path, data in posts.items():
         r = await h.client.post(path, data={"csrf": csrf, **data})
         assert r.status_code == 404, (path, r.status_code)
     rows = await b.rows("member")
     assert all(m["status"] == "active" for m in rows if m["tenant_id"] == b.tenant_id)
+    (after,) = [r for r in await b.rows("inbound_address") if r["tenant_id"] == b.tenant_id]
+    assert (after["status"], after["label"]) == ("active", None)
 
 
 async def test_cannot_link_other_tenant_objects_into_own_group(
